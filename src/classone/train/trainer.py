@@ -77,7 +77,7 @@ class ClassOneTrainer:
             ]
             if hasattr(self.model.backbone, "language_model"):
                 # Multi-modal architectures like Gemma 4: target linear projections in language_model
-                target_modules = r".*language_model.*(q_proj|o_proj|gate_proj|up_proj|down_proj).*"
+                target_modules = r".*language_model.*(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj).*"
             else:
                 # Filter to candidates that actually exist as Linear in the backbone
                 existing_modules = {
@@ -112,7 +112,13 @@ class ClassOneTrainer:
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
         self.optimizer = torch.optim.AdamW(trainable_params, lr=self.lr, weight_decay=self.weight_decay)
 
-    def train_step(self, batch: list[TrainingItem]) -> dict[str, float]:
+    def train_step(
+        self,
+        batch: list[TrainingItem],
+        world_size: int = 1,
+        q_out: Any | None = None,
+        q_in: Any | None = None,
+    ) -> dict[str, float]:
         """Executes a single gradient update across a batch of multi-task items with per-item accumulation."""
         self.model.train()
         self.optimizer.zero_grad()
@@ -153,16 +159,16 @@ class ClassOneTrainer:
 
                 if span.question_type == "noul":
                     h_query = seq_hidden[span.query_token_idx]
-                    prob = self.model.noul_head(h_query)
+                    prob, logit = self.model.noul_head(h_query, return_logits=True)
                     target_tensor = torch.tensor([float(target)], device=self.device, dtype=torch.float32)
-                    q_loss = self.loss_fn.forward_binary(prob, target_tensor)
+                    q_loss = self.loss_fn.forward_binary(prob, target_tensor, logit=logit)
                     item_loss = item_loss + q_loss
                     item_question_count += 1
 
                 elif span.question_type == "choice":
                     h_query = seq_hidden[span.query_token_idx]
                     h_opts = torch.stack([seq_hidden[idx] for idx in span.option_token_indices])
-                    probs = self.model.choice_head(h_query, h_opts)  # [num_options]
+                    probs, logits = self.model.choice_head(h_query, h_opts, return_logits=True)
 
                     # Target index resolution
                     if isinstance(target, str):
@@ -171,14 +177,16 @@ class ClassOneTrainer:
                         target_idx = int(target)
 
                     target_tensor = torch.tensor([target_idx], device=self.device, dtype=torch.long)
-                    q_loss = self.loss_fn.forward_multiclass(probs.unsqueeze(0), target_tensor)
+                    q_loss = self.loss_fn.forward_multiclass(
+                        probs.unsqueeze(0), target_tensor, logits=logits.unsqueeze(0)
+                    )
                     item_loss = item_loss + q_loss
                     item_question_count += 1
 
                 elif span.question_type == "score":
                     h_query = seq_hidden[span.query_token_idx]
                     h_levels = torch.stack([seq_hidden[idx] for idx in span.option_token_indices])
-                    _, probs = self.model.score_head(h_query, h_levels)
+                    _, probs, logits = self.model.score_head(h_query, h_levels, return_logits=True)
 
                     # Robust score target parsing (supports numeric index, string level number, or rubric text)
                     if isinstance(target, (int, float)):
@@ -189,7 +197,9 @@ class ClassOneTrainer:
                         target_idx = 0
 
                     target_tensor = torch.tensor([target_idx], device=self.device, dtype=torch.long)
-                    q_loss = self.loss_fn.forward_multiclass(probs.unsqueeze(0), target_tensor)
+                    q_loss = self.loss_fn.forward_multiclass(
+                        probs.unsqueeze(0), target_tensor, logits=logits.unsqueeze(0)
+                    )
                     item_loss = item_loss + q_loss
                     item_question_count += 1
 
@@ -198,13 +208,68 @@ class ClassOneTrainer:
                 scaled_loss.backward()
                 accumulated_loss_val += float(item_loss.item())
 
+            del item_loss, seq_hidden, hidden_states
+
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        if q_out is not None and q_in is not None:
+            self.sync_gradients_shm(q_out, q_in)
+        elif world_size > 1:
+            self.sync_gradients(world_size)
         self.optimizer.step()
+        self.optimizer.zero_grad(set_to_none=True)
 
         return {
             "loss": accumulated_loss_val / total_valid_questions,
             "questions": total_valid_questions,
         }
+
+    def sync_gradients_shm(self, q_out, q_in):
+        """Synchronizes gradients across local GPUs via Windows shared memory queue with zero socket overhead."""
+        trainable_grads = []
+        for p in self.model.parameters():
+            if p.requires_grad:
+                if p.grad is not None:
+                    trainable_grads.append(p.grad.data.view(-1).cpu())
+                else:
+                    trainable_grads.append(torch.zeros(p.numel(), dtype=torch.float32, device="cpu"))
+
+        if not trainable_grads:
+            return
+
+        flat_grad = torch.cat(trainable_grads)
+        q_out.put(flat_grad)
+        other_grad = q_in.get()
+        avg_grad = (flat_grad + other_grad) / 2.0
+
+        offset = 0
+        for p in self.model.parameters():
+            if p.requires_grad:
+                numel = p.numel()
+                g_slice = avg_grad[offset : offset + numel].view_as(p.data).to(device=self.device, dtype=p.dtype)
+                p.grad = g_slice
+                offset += numel
+
+    def sync_gradients(self, world_size: int):
+        """Reduces gradients of trainable parameters across distributed workers via flat buffer."""
+        import torch.distributed as dist
+
+        if world_size <= 1 or not dist.is_initialized():
+            return
+
+        trainable_grads = [p.grad for p in self.model.parameters() if p.requires_grad and p.grad is not None]
+        if not trainable_grads:
+            return
+
+        flat_grad = torch.cat([g.view(-1) for g in trainable_grads]).cpu()
+        dist.all_reduce(flat_grad, op=dist.ReduceOp.SUM)
+        flat_grad = flat_grad / world_size
+
+        offset = 0
+        for p in self.model.parameters():
+            if p.requires_grad and p.grad is not None:
+                numel = p.grad.numel()
+                p.grad.data.copy_(flat_grad[offset : offset + numel].view_as(p.grad).to(self.device))
+                offset += numel
 
     def calibrate_temperature(
         self,

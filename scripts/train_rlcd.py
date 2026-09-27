@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
-"""CLI utility to train a ClassOne System 1 decision model using LoRA and RLCD loss.
+"""Multi-GPU Distributed Fine-Tuning & Calibration script for ClassOne System 1 Decision Model.
 
-Supports:
-- Single-GPU (CUDA / Apple Silicon MPS / CPU)
-- Multi-GPU DistributedDataParallel (DDP) via torchrun (e.g. 2x RTX 16GB GPUs)
+Trains ClassOne decision heads and PEFT LoRA adapters using RLCD (Proper Scoring + Contrastive Margin Loss)
+across single or multiple GPUs (NVIDIA RTX 5060 Ti x 2).
+
+Usage:
+    # Train across both GPUs automatically:
+    python scripts/train_rlcd.py --data data/training_corpus.jsonl --gpus 2 --epochs 3 --batch-size 4
+
+    # Single GPU:
+    python scripts/train_rlcd.py --data data/training_corpus.jsonl --gpus 1
 """
 
 import argparse
 import os
 import sys
+import time
+
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import torch
 import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, DistributedSampler
+import torch.multiprocessing as mp
 from transformers import AutoTokenizer
 
 from classone.data.dataset import (
     ClassOneDataset,
     bundle_multi_task_items,
-    classone_collate_fn,
     create_classone_dataloader,
 )
 from classone.modeling.configuration_classone import ClassOneConfig
@@ -30,7 +37,7 @@ from classone.train.trainer import ClassOneTrainer
 
 
 def generate_synthetic_dataset(num_samples: int = 50) -> ClassOneDataset:
-    """Generates a diverse synthetic multi-task dataset for fine-tuning & calibration."""
+    """Generates a synthetic multi-task dataset if no data file is provided."""
     items = []
     topics = [
         ("My monthly charge was doubled and I demand my money back.", "billing", 1.0, 3),
@@ -58,20 +65,22 @@ def generate_synthetic_dataset(num_samples: int = 50) -> ClassOneDataset:
         item = bundle_multi_task_items(
             state=state,
             questions={
-                "is_refund": NoulQuestion(instructions="Is customer asking for a refund or money back?"),
-                "department": ChoiceQuestion(
-                    instructions="Assign ticket to department queue:",
+                "dept": ChoiceQuestion(
+                    instructions="Route this support ticket to the appropriate department:",
                     criteria=all_criteria,
                 ),
-                "severity": ScoreQuestion(
-                    instructions="Assess ticket urgency:",
+                "refund_request": NoulQuestion(
+                    instructions="Does the customer explicitly request a refund or billing adjustment?",
+                ),
+                "urgency": ScoreQuestion(
+                    instructions="Rate the operational urgency of this ticket:",
                     criteria=rubric,
                 ),
             },
             targets={
-                "is_refund": is_refund,
-                "department": dept,
-                "severity": urgency,
+                "dept": dept,
+                "refund_request": is_refund,
+                "urgency": urgency,
             },
         )
         items.append(item)
@@ -84,13 +93,13 @@ def parse_args():
     parser.add_argument(
         "--model",
         type=str,
-        default="google/gemma-4-e2b-it",
-        help="Backbone model ID or path (e.g. google/gemma-4-e2b-it, google/gemma-2-2b-it, or standalone)",
+        default="devops-thiago/classone-gemma4-e2b",
+        help="Backbone model ID or path (default: devops-thiago/classone-gemma4-e2b)",
     )
     parser.add_argument(
         "--data",
         type=str,
-        default=None,
+        default="data/training_corpus.jsonl",
         help="Path to JSONL dataset. If omitted, generates synthetic training samples.",
     )
     parser.add_argument(
@@ -99,22 +108,21 @@ def parse_args():
         default=60,
         help="Number of synthetic samples to generate if --data is not provided",
     )
-    parser.add_argument("--epochs", type=int, default=2, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size per GPU")
     parser.add_argument("--lr", type=float, default=2e-4, help="Learning rate")
     parser.add_argument("--lora-r", type=int, default=16, help="LoRA rank")
     parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha scaling")
     parser.add_argument(
-        "--device",
-        type=str,
-        default="auto",
-        choices=["auto", "mps", "cuda", "cpu"],
-        help="Target training device",
+        "--gpus",
+        type=int,
+        default=None,
+        help="Number of GPUs to use for training (auto-detects available devices)",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./checkpoints/classone_v1",
+        default="checkpoints/classone_gemma4_e2b",
         help="Directory to save fine-tuned heads and LoRA weights",
     )
     parser.add_argument(
@@ -126,42 +134,23 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
+def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None):
+    """Worker function executed per GPU."""
+    is_main_process = rank == 0
 
-    # Detect multi-GPU distributed environment (torchrun)
-    local_rank = int(os.environ.get("LOCAL_RANK", -1))
-    is_distributed = local_rank != -1
-
-    if is_distributed:
-        torch.cuda.set_device(local_rank)
-        device = f"cuda:{local_rank}"
-        backend = "gloo" if sys.platform == "win32" else "nccl"
-        dist.init_process_group(backend=backend)
-        global_rank = dist.get_rank()
-        world_size = dist.get_world_size()
+    if world_size > 1:
+        device = torch.device(f"cuda:{rank}")
+        torch.cuda.set_device(device)
     else:
-        global_rank = 0
-        world_size = 1
-        if args.device == "auto":
-            if torch.cuda.is_available():
-                device = "cuda"
-            elif torch.backends.mps.is_available():
-                device = "mps"
-            else:
-                device = "cpu"
-        else:
-            device = args.device
-
-    is_main_process = global_rank == 0
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if is_main_process:
-        print(f"[*] Initializing ClassOne Training (World Size: {world_size}, Device: {device})")
+        print(f"[*] Initializing ClassOne Training on {world_size} GPU(s)...")
 
     # Initialize Tokenizer and Model
     if args.model == "standalone":
         if is_main_process:
-            print("[*] Using standalone lightweight transformer backbone (rapid test mode)")
+            print("[*] Using standalone lightweight transformer backbone")
         from tokenizers import Tokenizer
         from tokenizers.models import WordLevel
         from tokenizers.pre_tokenizers import Whitespace
@@ -176,7 +165,7 @@ def main():
         model = ClassOneModel(config)
     else:
         if is_main_process:
-            print(f"[*] Loading pretrained HuggingFace backbone: {args.model}")
+            print(f"[*] Loading backbone: {args.model}")
         try:
             tokenizer = AutoTokenizer.from_pretrained(args.model)
             builder = ClassOnePromptBuilder(tokenizer)
@@ -184,109 +173,116 @@ def main():
                 base_model_name_or_path=args.model,
                 tokenizer=tokenizer,
                 device=device,
-                torch_dtype=torch.bfloat16
-                if "cuda" in str(device)
-                else (torch.float16 if device == "mps" else torch.float32),
+                torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             )
         except Exception as exc:
             if is_main_process:
                 print(f"[!] Error loading backbone '{args.model}': {exc}")
-                print("[!] If this is a gated model (like Gemma), ensure HF_TOKEN is exported.")
             sys.exit(1)
 
-    # Initialize Trainer
+    # Initialize Trainer and LoRA
     trainer = ClassOneTrainer(
         model=model,
         prompt_builder=builder,
         lr=args.lr,
         device=device,
     )
-
-    # Attach LoRA if not standalone
     if args.model != "standalone":
         if is_main_process:
             print(f"[*] Attaching LoRA adapters (r={args.lora_r}, alpha={args.lora_alpha})...")
         trainer.enable_lora(r=args.lora_r, lora_alpha=args.lora_alpha)
-
-    # Wrap with DistributedDataParallel if using multiple GPUs
-    if is_distributed:
-        trainer.model = DDP(trainer.model, device_ids=[local_rank], find_unused_parameters=True)
-
-    # Load or generate dataset
-    if args.data:
-        if not os.path.exists(args.data):
+        if hasattr(model.backbone, "gradient_checkpointing_enable"):
+            model.backbone.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
             if is_main_process:
-                print(f"[!] Specified dataset file does not exist: {args.data}")
-            sys.exit(1)
-        if is_main_process:
-            print(f"[*] Loading training data from: {args.data}")
-        dataset = ClassOneDataset.load_jsonl(args.data)
-    else:
-        if is_main_process:
-            print(f"[*] Generating synthetic multi-task training dataset ({args.num_samples} samples)...")
-        dataset = generate_synthetic_dataset(num_samples=args.num_samples)
+                print("[*] Gradient checkpointing enabled (80% activation memory reduction)")
 
-    # Configure Distributed DataLoader
-    if is_distributed:
-        sampler = DistributedSampler(dataset, num_replicas=world_size, rank=global_rank, shuffle=True)
-        train_loader = DataLoader(
-            dataset,
-            batch_size=args.batch_size,
-            sampler=sampler,
-            collate_fn=classone_collate_fn,
-        )
+    # Load dataset
+    if args.data and os.path.exists(args.data):
+        full_dataset = ClassOneDataset.load_jsonl(args.data)
+        if is_main_process:
+            print(f"[*] Loaded {len(full_dataset)} items from {args.data}")
     else:
-        train_loader = create_classone_dataloader(dataset, batch_size=args.batch_size, shuffle=True)
+        full_dataset = generate_synthetic_dataset(num_samples=args.num_samples)
+        if is_main_process:
+            print(f"[*] Generated {len(full_dataset)} synthetic items")
+
+    # Shard dataset across GPUs
+    if world_size > 1:
+        rank_items = [full_dataset.items[i] for i in range(len(full_dataset.items)) if i % world_size == rank]
+        local_dataset = ClassOneDataset(rank_items)
+    else:
+        local_dataset = full_dataset
+
+    train_loader = create_classone_dataloader(local_dataset, batch_size=args.batch_size, shuffle=True)
 
     if is_main_process:
-        print(f"[*] Total dataset size: {len(dataset)} items | Per-GPU Batch size: {args.batch_size}")
-        print("\n=== Starting RLCD Multi-Task Fine-Tuning ===")
+        print(f"[*] Total dataset size: {len(full_dataset)} items | Shard per GPU: {len(local_dataset)} items")
+        print("\n=== Starting RLCD Multi-GPU Fine-Tuning ===")
 
     # Training Loop
+    t0_train = time.time()
     for epoch in range(1, args.epochs + 1):
-        if is_distributed:
-            sampler.set_epoch(epoch)
-
         epoch_loss = 0.0
-        total_q = 0
         step_count = 0
 
         for batch in train_loader:
             step_count += 1
-            metrics = trainer.train_step(batch)
+            metrics = trainer.train_step(batch, world_size=world_size, q_out=q_out, q_in=q_in)
             epoch_loss += metrics["loss"]
-            total_q += metrics["questions"]
 
-            if is_main_process and (step_count % 5 == 0 or step_count == len(train_loader)):
+            if step_count % 20 == 0 and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            if is_main_process and (step_count % 15 == 0 or step_count == len(train_loader)):
                 print(
                     f"  Epoch [{epoch}/{args.epochs}] | Step [{step_count}/{len(train_loader)}] | "
-                    f"RLCD Loss: {metrics['loss']:.4f} ({metrics['questions']} questions)"
+                    f"RLCD Loss: {metrics['loss']:.4f}"
                 )
 
         if is_main_process:
             avg_epoch_loss = epoch_loss / max(1, step_count)
             print(f"[*] Epoch {epoch} Completed | Average Loss: {avg_epoch_loss:.4f}\n")
 
-    # Temperature Calibration & Checkpoint (Rank 0 only)
+    train_time = time.time() - t0_train
     if is_main_process:
-        # Unwrap DDP if distributed
-        raw_model = trainer.model.module if is_distributed else trainer.model
-        eval_trainer = ClassOneTrainer(model=raw_model, prompt_builder=builder, device=device)
+        print(f"[✓] Multi-GPU Training finished in {train_time:.1f}s")
 
+    # Post-hoc Calibration & Checkpoint Export (Rank 0 only)
+    if is_main_process:
         if args.calibrate:
-            print("[*] Running post-hoc temperature calibration on validation split...")
-            val_samples = dataset.items[:10]
-            calibrated_temps = eval_trainer.calibrate_temperature(val_samples, lr=0.05, max_epochs=15)
+            print("[*] Running post-hoc temperature calibration...")
+            val_samples = full_dataset.items[:25]
+            calibrated_temps = trainer.calibrate_temperature(val_samples, lr=0.05, max_epochs=15)
             print(f"  Calibrated Noul Temp:   {calibrated_temps['noul_temp']:.4f}")
             print(f"  Calibrated Choice Temp: {calibrated_temps['choice_temp']:.4f}")
             print(f"  Calibrated Score Temp:  {calibrated_temps['score_temp']:.4f}")
 
-        print(f"\n[*] Saving trained model checkpoint to: {args.output_dir}")
-        eval_trainer.save_checkpoint(args.output_dir)
-        print("[OK] Training & checkpoint export completed successfully!")
+        print(f"[*] Saving model checkpoint to: {args.output_dir}")
+        trainer.save_checkpoint(args.output_dir)
+        print("[✓] Model checkpoint saved successfully!")
 
-    if is_distributed:
-        dist.destroy_process_group()
+
+def main():
+    args = parse_args()
+
+    num_gpus = args.gpus
+    if num_gpus is None:
+        num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
+
+    if num_gpus > 1:
+        print(f"[*] Launching Multi-GPU training on {num_gpus} devices using Shared-Memory IPC...")
+        q0 = mp.Queue(maxsize=2)
+        q1 = mp.Queue(maxsize=2)
+        p0 = mp.Process(target=run_training_worker, args=(0, num_gpus, args, q0, q1))
+        p1 = mp.Process(target=run_training_worker, args=(1, num_gpus, args, q1, q0))
+        p0.start()
+        p1.start()
+        p0.join()
+        p1.join()
+        if p0.exitcode != 0 or p1.exitcode != 0:
+            sys.exit(max(p0.exitcode or 0, p1.exitcode or 0))
+    else:
+        run_training_worker(rank=0, world_size=1, args=args)
 
 
 if __name__ == "__main__":

@@ -86,22 +86,31 @@ def expected_calibration_error(probs: torch.Tensor, targets: torch.Tensor, n_bin
 class RLCDLoss(nn.Module):
     """Reinforcement Learning for Calibrated Decisions (RLCD) multi-objective loss.
 
-    Combines Logarithmic Scoring (proper scoring rule rewarding true likelihood)
-    with Brier Score (penalizing probability deviation).
+    Combines Logarithmic Scoring (proper scoring rule rewarding true likelihood),
+    Brier Score (penalizing probability deviation), and Contrastive Margin Penalty.
     """
 
     def __init__(
         self,
         brier_weight: float = 0.5,
         log_weight: float = 1.0,
+        margin_weight: float = 0.5,
+        margin_threshold: float = 1.0,
         eps: float = 1e-6,
     ):
         super().__init__()
         self.brier_weight = brier_weight
         self.log_weight = log_weight
+        self.margin_weight = margin_weight
+        self.margin_threshold = margin_threshold
         self.eps = eps
 
-    def forward_binary(self, prob: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def forward_binary(
+        self,
+        prob: torch.Tensor,
+        target: torch.Tensor,
+        logit: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Loss for Noul boolean decisions."""
         prob_f = prob.view(-1).float()
         target_f = target.view(-1).float()
@@ -113,9 +122,22 @@ class RLCDLoss(nn.Module):
         # Un-clamped Brier loss for pure proper scoring
         brier = torch.mean((prob_f - target_f) ** 2)
 
-        return self.log_weight * log_loss + self.brier_weight * brier
+        loss = self.log_weight * log_loss + self.brier_weight * brier
 
-    def forward_multiclass(self, probs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        if logit is not None and self.margin_weight > 0.0:
+            target_sign = 2.0 * target_f - 1.0
+            margin = self.margin_threshold - (target_sign * logit.view(-1).float())
+            margin_loss = F.relu(margin).mean()
+            loss = loss + self.margin_weight * margin_loss
+
+        return loss
+
+    def forward_multiclass(
+        self,
+        probs: torch.Tensor,
+        targets: torch.Tensor,
+        logits: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """Loss for Choice / Score decisions."""
         num_classes = probs.shape[-1]
         probs_f = probs.float()
@@ -128,4 +150,17 @@ class RLCDLoss(nn.Module):
         # Normalized multiclass Brier score (0.5 * sum squared difference)
         brier = 0.5 * torch.mean(torch.sum((probs_f - one_hot) ** 2, dim=-1))
 
-        return self.log_weight * log_loss + self.brier_weight * brier
+        loss = self.log_weight * log_loss + self.brier_weight * brier
+
+        if logits is not None and self.margin_weight > 0.0:
+            logits_f = logits.float()
+            if logits_f.dim() == 1:
+                logits_f = logits_f.unsqueeze(0)
+            target_logits = logits_f.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
+            mask = ~F.one_hot(targets, num_classes=num_classes).bool()
+            other_max = logits_f.masked_fill(~mask, float("-inf")).max(dim=-1).values
+            margin = self.margin_threshold - (target_logits - other_max)
+            margin_loss = F.relu(margin).mean()
+            loss = loss + self.margin_weight * margin_loss
+
+        return loss

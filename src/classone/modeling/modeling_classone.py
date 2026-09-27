@@ -38,25 +38,35 @@ class NoulHead(nn.Module):
     def temperature(self) -> torch.Tensor:
         return F.softplus(self.temperature_raw) + 0.1
 
-    def forward(self, h_query: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, h_query: torch.Tensor, return_logits: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Args:
 
         h_query: [batch_size, hidden_size] or [hidden_size]
+        return_logits: If True, returns (prob, logit)
         Returns:
-            probability tensor in [0, 1]
+            probability tensor in [0, 1] or (probability, unscaled logit)
         """
         if h_query.dim() == 1:
             h_query = h_query.unsqueeze(0)
         logit = self.net(h_query).squeeze(-1)
         prob = torch.sigmoid(logit / self.temperature)
+        if return_logits:
+            return prob, logit
         return prob
 
 
 class ChoiceHead(nn.Module):
-    """Categorical decision head computing calibrated distribution over dynamic options."""
+    """Categorical decision head computing calibrated distribution over dynamic options.
+
+    Combines directional dot-product similarity with a bilinear interaction scorer
+    [q; k; |q - k|; q * k] for expressive feature-level matching.
+    """
 
     def __init__(self, hidden_size: int, head_hidden_size: int, dropout: float = 0.1):
         super().__init__()
+        self.head_hidden_size = head_hidden_size
         self.q_proj = nn.Sequential(
             nn.Linear(hidden_size, head_hidden_size),
             nn.LayerNorm(head_hidden_size),
@@ -68,19 +78,30 @@ class ChoiceHead(nn.Module):
             nn.Dropout(dropout),
         )
         self.scale = 1.0 / math.sqrt(head_hidden_size)
+
+        # Bilinear interaction scorer over [q, k, |q - k|, q * k]
+        self.scorer = nn.Sequential(
+            nn.Linear(4 * head_hidden_size, head_hidden_size),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(head_hidden_size, 1),
+        )
         self.temperature_raw = nn.Parameter(torch.zeros(1))
 
     @property
     def temperature(self) -> torch.Tensor:
         return F.softplus(self.temperature_raw) + 0.1
 
-    def forward(self, h_query: torch.Tensor, h_options: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, h_query: torch.Tensor, h_options: torch.Tensor, return_logits: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Args:
 
-        h_query: Query token vector [hidden_size]
+        h_query: Query token vector [hidden_size] or [1, hidden_size]
         h_options: Candidate option token vectors [num_options, hidden_size]
+        return_logits: If True, returns (probs, logits)
         Returns:
-            Probability distribution over options [num_options]
+            Probability distribution over options [num_options] or (probs, unscaled logits)
         """
         if h_query.dim() == 1:
             h_query = h_query.unsqueeze(0)  # [1, hidden_size]
@@ -88,10 +109,30 @@ class ChoiceHead(nn.Module):
         q = self.q_proj(h_query)  # [1, head_hidden_size]
         k = self.k_proj(h_options)  # [num_options, head_hidden_size]
 
-        # Dot-product similarity
-        logits = torch.matmul(q, k.transpose(0, 1)).squeeze(0) * self.scale
+        num_options = k.shape[0]
+        q_exp = q.expand(num_options, -1)
+
+        # 1. Scaled dot-product similarity
+        dot = torch.sum(q_exp * k, dim=-1) * self.scale
+
+        # 2. Bilinear interaction features
+        diff = torch.abs(q_exp - k)
+        prod = q_exp * k
+        features = torch.cat([q_exp, k, diff, prod], dim=-1)
+        score_mlp = self.scorer(features).squeeze(-1)
+
+        logits = dot + score_mlp
         probs = F.softmax(logits / self.temperature, dim=-1)
+        if return_logits:
+            return probs, logits
         return probs
+
+    def load_state_dict(self, state_dict: dict[str, Any], strict: bool = True, assign: bool = False):
+        """Loads state dict with backward compatibility for legacy checkpoints lacking bilinear scorer."""
+        has_scorer = any(k.startswith("scorer.") for k in state_dict)
+        if not has_scorer:
+            strict = False
+        return super().load_state_dict(state_dict, strict=strict, assign=assign)
 
 
 class ScoreHead(nn.Module):
@@ -105,20 +146,35 @@ class ScoreHead(nn.Module):
     def temperature(self) -> torch.Tensor:
         return self.choice_evaluator.temperature
 
-    def forward(self, h_query: torch.Tensor, h_levels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, h_query: torch.Tensor, h_levels: torch.Tensor, return_logits: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Args:
 
         h_query: Query token vector [hidden_size]
         h_levels: Rubric level vectors [num_levels, hidden_size]
+        return_logits: If True, returns (expected_score, probabilities, logits)
         Returns:
-            (expected_score, probabilities)
+            (expected_score, probabilities) or (expected_score, probabilities, logits)
         """
-        probs = self.choice_evaluator(h_query, h_levels)
+        if return_logits:
+            probs, logits = self.choice_evaluator(h_query, h_levels, return_logits=True)
+        else:
+            probs = self.choice_evaluator(h_query, h_levels)
         num_levels = probs.shape[-1]
         # Match level_weights dtype to probs dtype to prevent Half/Float runtime crash
         level_weights = torch.arange(1, num_levels + 1, dtype=probs.dtype, device=probs.device)
         expected_score = torch.sum(probs * level_weights)
+        if return_logits:
+            return expected_score, probs, logits
         return expected_score, probs
+
+    def load_state_dict(self, state_dict: dict[str, Any], strict: bool = True, assign: bool = False):
+        """Loads state dict with backward compatibility for legacy checkpoints lacking bilinear scorer."""
+        has_scorer = any(k.startswith("choice_evaluator.scorer.") for k in state_dict)
+        if not has_scorer:
+            strict = False
+        return super().load_state_dict(state_dict, strict=strict, assign=assign)
 
 
 class ClassOneModel(PreTrainedModel):
@@ -171,6 +227,7 @@ class ClassOneModel(PreTrainedModel):
         tokenizer: Any | None = None,
         torch_dtype: torch.dtype | None = None,
         device: str | torch.device | None = None,
+        quantization: str | None = None,
         **backbone_kwargs,
     ) -> ClassOneModel:
         """Instantiates ClassOne with an existing HuggingFace backbone (e.g. Gemma 4 E2B).
@@ -181,6 +238,7 @@ class ClassOneModel(PreTrainedModel):
             tokenizer: Optional tokenizer; if provided, backbone token embeddings are resized.
             torch_dtype: Precision dtype (e.g. torch.bfloat16, torch.float16, torch.float32).
             device: Target device ('mps', 'cuda', 'cpu'); if None, detects automatically.
+            quantization: Quantization format ('8bit', '4bit', 'nf4'); loads backbone via bitsandbytes.
             **backbone_kwargs: Extra keyword arguments forwarded to AutoModel.from_pretrained.
         """
         if isinstance(base_model_name_or_path, nn.Module):
@@ -191,6 +249,29 @@ class ClassOneModel(PreTrainedModel):
             kwargs = dict(backbone_kwargs)
             if torch_dtype is not None:
                 kwargs["torch_dtype"] = torch_dtype
+
+            if quantization:
+                from transformers import BitsAndBytesConfig
+
+                quant_str = str(quantization).lower().replace("-", "")
+                if quant_str in ("8bit", "int8"):
+                    kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+                elif quant_str in ("4bit", "nf4", "int4"):
+                    compute_dtype = torch_dtype or torch.float16
+                    kwargs["quantization_config"] = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_compute_dtype=compute_dtype,
+                    )
+                else:
+                    raise ValueError(f"Unsupported quantization: {quantization}. Choose '8bit' or '4bit'.")
+
+                if "device_map" not in kwargs and device is not None:
+                    kwargs["device_map"] = str(device)
+                elif "device_map" not in kwargs:
+                    kwargs["device_map"] = "auto"
+
             backbone = AutoModel.from_pretrained(model_name, **kwargs)
 
         # Resize token embeddings if tokenizer includes ClassOne delimiter tokens
@@ -228,9 +309,16 @@ class ClassOneModel(PreTrainedModel):
         else:
             target_device = torch.device(device)
 
-        model.to(target_device)
-        if torch_dtype is not None:
-            model.to(dtype=torch_dtype)
+        is_quantized = getattr(backbone, "is_loaded_in_8bit", False) or getattr(backbone, "is_loaded_in_4bit", False)
+        if is_quantized:
+            head_dtype = torch_dtype or torch.float16
+            model.noul_head.to(device=target_device, dtype=head_dtype)
+            model.choice_head.to(device=target_device, dtype=head_dtype)
+            model.score_head.to(device=target_device, dtype=head_dtype)
+        else:
+            model.to(target_device)
+            if torch_dtype is not None:
+                model.to(dtype=torch_dtype)
 
         return model
 
@@ -253,8 +341,14 @@ class ClassOneModel(PreTrainedModel):
             # Hugging Face backbone
             outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
             if hasattr(outputs, "last_hidden_state"):
-                return outputs.last_hidden_state
-            return outputs[0]
+                hidden = outputs.last_hidden_state
+            else:
+                hidden = outputs[0]
+
+            head_dtype = next(self.noul_head.parameters()).dtype
+            if hidden.dtype != head_dtype:
+                hidden = hidden.to(dtype=head_dtype)
+            return hidden
 
     def evaluate_batch(
         self,

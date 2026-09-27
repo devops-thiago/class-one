@@ -49,8 +49,33 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                     config = ClassOneConfig(hidden_size=256, head_hidden_size=128)
                     _model = ClassOneModel(config)
                 else:
+                    import torch
+
+                    quant = os.environ.get("CLASSONE_QUANTIZATION")
+                    device = os.environ.get("CLASSONE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
                     _tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    _model = ClassOneModel.from_backbone(model_name, tokenizer=_tokenizer)
+                    _model = ClassOneModel.from_backbone(
+                        model_name,
+                        tokenizer=_tokenizer,
+                        device=device,
+                        quantization=quant,
+                    )
+                    # Load trained decision heads if available
+                    heads_path = os.environ.get("CLASSONE_HEADS_PATH")
+                    if not heads_path and os.path.exists(os.path.join(model_name, "classone_heads.pt")):
+                        heads_path = os.path.join(model_name, "classone_heads.pt")
+                    if not heads_path and "/" in model_name:
+                        try:
+                            from huggingface_hub import hf_hub_download
+
+                            heads_path = hf_hub_download(model_name, "classone_heads.pt")
+                        except Exception:
+                            heads_path = None
+                    if heads_path and os.path.exists(heads_path):
+                        heads = torch.load(heads_path, map_location=_model.device)
+                        _model.noul_head.load_state_dict(heads["noul_head"])
+                        _model.choice_head.load_state_dict(heads["choice_head"])
+                        _model.score_head.load_state_dict(heads["score_head"])
 
                 _prompt_builder = ClassOnePromptBuilder(_tokenizer)
 
