@@ -1,0 +1,20 @@
+services:
+  class-one-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: class-one:latest
+    container_name: class-one-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CLASSONE_BASE_MODEL=standalone  # or google/gemma-2-2b-it / google/gemma-4-e2b
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
