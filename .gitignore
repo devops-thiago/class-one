@@ -1,0 +1,42 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Checkpoints and weights
+checkpoints/
+models/
+*.pt
+*.bin
+*.safetensors
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.credentials
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
