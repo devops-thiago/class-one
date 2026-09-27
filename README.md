@@ -112,6 +112,9 @@ python scripts/run_classone.py --model google/gemma-2-2b-it --device auto
 
 # Benchmark latency vs traditional autoregressive LLMs:
 python scripts/benchmark_latency.py --iterations 30
+
+# Publish a model checkpoint to the Hugging Face Hub:
+python scripts/push_to_hub.py --checkpoint-dir ./checkpoints/classone_v1 --repo-id your-org/classone-gemma-4-e2b
 ```
 
 ---

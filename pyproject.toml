@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "classone"
-version = "0.1.0"
+version = "0.1.1"
 description = "Open-source System 1 decision model architecture built on Gemma 4 E2B"
 readme = "README.md"
-authors = [{ name = "Thiago" }]
+authors = [{ name = "Thiago Gonzaga" }]
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.5.0",
