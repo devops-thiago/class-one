@@ -89,6 +89,22 @@ def test_classone_endpoint_alias(client):
     assert "deletion" in response.json()["answers"]
 
 
+def test_systemone_endpoint_alias(client):
+    payload = {
+        "model": "class-one-gemma-4-e2b-it",
+        "state": "User requested account deletion.",
+        "questions": {
+            "deletion": {
+                "type": "noul",
+                "instructions": "Is user requesting account deletion?",
+            }
+        },
+    }
+    response = client.post("/v1/systemone", json=payload)
+    assert response.status_code == 200
+    assert "deletion" in response.json()["answers"]
+
+
 def test_decide_max_questions_limit(client):
     too_many_questions = {
         f"q_{i}": {

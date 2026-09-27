@@ -261,12 +261,19 @@ Measured on **NVIDIA GeForce RTX 5060 Ti** (CUDA, float16), 30 iterations after 
 
 | Metric | ClassOne (Single-Pass) | Autoregressive (50 tokens) |
 |---|---|---|
-| Mean Latency | **64.62 ms** | 845.77 ms |
-| P50 (Median) | **64.95 ms** | 844.45 ms |
-| P95 Latency | **65.66 ms** | 861.20 ms |
-| Throughput | **15.5 req/s** | 1.2 req/s |
+| Mean Latency | **47.07 ms** | 1,048.57 ms |
+| P50 (Median) | **46.96 ms** | 1,047.23 ms |
+| P95 Latency | **48.79 ms** | 1,062.45 ms |
+| Throughput | **21.2 req/s** | 1.0 req/s |
 | Output Tokens | **0** | 50 |
-| **Speedup** | **13.1× faster** | — |
+| **Speedup** | **22.3× faster** | — |
+
+### Edge vs Cloud Latency (ClassOne vs TypeSafe Jev API)
+
+Measured against TypeSafe AI's Jev (v1.13) cloud API:
+- **ClassOne (Local RTX 5060 Ti):** **52.49 ms** mean latency (19.1 req/s, $0.00 inference cost, 100% private)
+- **TypeSafe Jev (Cloud API):** **329.90 ms** mean latency (3.0 req/s)
+- **Edge Speedup:** **6.3× faster** than cloud API round-trip latency
 
 ## Decision Primitives
 
@@ -428,6 +435,12 @@ def main():
         sys.exit(1)
 
     token = args.token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if not token and os.path.exists(".env"):
+        with open(".env", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("HF_TOKEN="):
+                    token = line.strip().split("=", 1)[1].strip().strip("'\"")
+                    break
     if not token:
         print("[!] Error: No Hugging Face token provided.")
         print("[!] Set HF_TOKEN environment variable or pass --token <your_token>.")

@@ -317,12 +317,13 @@ class ClassOneModel(PreTrainedModel):
                         best_idx = int(torch.argmax(probs).item())
                         best_key = span.option_keys[best_idx]
 
-                        # Confidence: margin between top-1 and top-2
-                        if len(probs_list) > 1:
-                            top2 = torch.topk(probs, k=2).values
-                            conf = float((top2[0] - top2[1]).item())
+                        # Normalized Confidence: (K * P_max - 1) / (K - 1)
+                        num_options = len(probs_list)
+                        if num_options > 1:
+                            p_max = float(torch.max(probs).item())
+                            conf = (num_options * p_max - 1.0) / (num_options - 1.0)
                         else:
-                            conf = float(probs[0].item())
+                            conf = 1.0
 
                         conf = 0.0 if math.isnan(conf) else max(0.0, min(1.0, conf))
 
@@ -339,7 +340,15 @@ class ClassOneModel(PreTrainedModel):
                         probs_list = probs.tolist()
 
                         prob_dict = {key: round(float(val), 4) for key, val in zip(span.option_keys, probs_list)}
-                        conf = float(torch.max(probs).item())
+
+                        # Normalized Confidence across score levels: (K * P_max - 1) / (K - 1)
+                        num_levels = len(probs_list)
+                        if num_levels > 1:
+                            p_max = float(torch.max(probs).item())
+                            conf = (num_levels * p_max - 1.0) / (num_levels - 1.0)
+                        else:
+                            conf = 1.0
+
                         conf = 0.0 if math.isnan(conf) else max(0.0, min(1.0, conf))
 
                         answers[q_id] = ScoreResult(

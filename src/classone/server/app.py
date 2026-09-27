@@ -87,6 +87,7 @@ def health_check():
 
 @app.post("/v1/decide", response_model=DecisionResponse)
 @app.post("/v1/classone", response_model=DecisionResponse)
+@app.post("/v1/systemone", response_model=DecisionResponse)
 def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
     """Evaluates arbitrary typed questions against unstructured state in a single pass."""
     # Input validation guards against DoS
