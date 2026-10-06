@@ -21,6 +21,7 @@ dist/
 # Checkpoints and weights
 checkpoints/
 models/
+worktrees/
 *.pt
 *.bin
 *.safetensors

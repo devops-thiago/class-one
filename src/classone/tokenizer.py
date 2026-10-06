@@ -60,9 +60,30 @@ class ClassOnePromptBuilder:
 
     def __init__(self, tokenizer: PreTrainedTokenizerBase):
         self.tokenizer = tokenizer
-        # Add special tokens if not already present
-        self.tokenizer.add_special_tokens({"additional_special_tokens": SPECIAL_TOKENS})
-        self.special_token_ids = {tok: self.tokenizer.convert_tokens_to_ids(tok) for tok in SPECIAL_TOKENS}
+        has_existing_custom = (
+            hasattr(tokenizer, "convert_tokens_to_ids")
+            and tokenizer.convert_tokens_to_ids("<|state_start|>") is not None
+            and tokenizer.convert_tokens_to_ids("<|state_start|>") != getattr(tokenizer, "unk_token_id", -1)
+        )
+        has_unused = (
+            not has_existing_custom
+            and hasattr(tokenizer, "convert_tokens_to_ids")
+            and tokenizer.convert_tokens_to_ids("<unused0>") is not None
+            and tokenizer.convert_tokens_to_ids("<unused0>") != getattr(tokenizer, "unk_token_id", -1)
+        )
+
+        if has_unused:
+            # Map delimiters to native in-vocab reserved tokens (<unused0>..<unused11>)
+            # This avoids resizing the 42-layer Per-Layer Embeddings (PLE) in Gemma 4, saving 5.25 GB VRAM
+            self.delimiter_map = {special: f"<unused{i}>" for i, special in enumerate(SPECIAL_TOKENS)}
+            self.special_token_ids = {
+                special: self.tokenizer.convert_tokens_to_ids(f"<unused{i}>")
+                for i, special in enumerate(SPECIAL_TOKENS)
+            }
+        else:
+            self.delimiter_map = {tok: tok for tok in SPECIAL_TOKENS}
+            self.tokenizer.add_special_tokens({"additional_special_tokens": SPECIAL_TOKENS})
+            self.special_token_ids = {tok: self.tokenizer.convert_tokens_to_ids(tok) for tok in SPECIAL_TOKENS}
 
     def serialize_state(self, state: str | dict[str, Any] | list[Any]) -> str:
         """Serializes state into text."""
@@ -80,8 +101,21 @@ class ClassOnePromptBuilder:
         To guarantee exact token index tracking without tokenizer ambiguity, tokens
         are constructed segment-by-segment.
         """
+        d_state_start = self.delimiter_map["<|state_start|>"]
+        d_state_end = self.delimiter_map["<|state_end|>"]
+        d_noul_start = self.delimiter_map["<|noul_start|>"]
+        d_noul_end = self.delimiter_map["<|noul_end|>"]
+        d_choice_start = self.delimiter_map["<|choice_start|>"]
+        d_choice_end = self.delimiter_map["<|choice_end|>"]
+        d_opt_start = self.delimiter_map["<|opt_start|>"]
+        d_opt_end = self.delimiter_map["<|opt_end|>"]
+        d_score_start = self.delimiter_map["<|score_start|>"]
+        d_score_end = self.delimiter_map["<|score_end|>"]
+        d_level_start = self.delimiter_map["<|level_start|>"]
+        d_level_end = self.delimiter_map["<|level_end|>"]
+
         state_str = self.serialize_state(state)
-        state_prefix = f"<|state_start|>\n{state_str}\n<|state_end|>\n"
+        state_prefix = f"{d_state_start}\n{state_str}\n{d_state_end}\n"
         prefix_ids = self.tokenizer.encode(
             state_prefix,
             add_special_tokens=True,
@@ -98,7 +132,7 @@ class ClassOnePromptBuilder:
             instructions_summary = "\n".join(
                 f"- [{qid}]: {getattr(q, 'instructions', '').strip()}" for qid, q in questions.items()
             )
-            preamble_text = f"<|state_start|>\nTarget Objectives:\n{instructions_summary}\n<|state_end|>\n"
+            preamble_text = f"{d_state_start}\nTarget Objectives:\n{instructions_summary}\n{d_state_end}\n"
             preamble_ids = self.tokenizer.encode(preamble_text, add_special_tokens=True, return_tensors=None)
             text_parts.append(preamble_text)
             current_ids.extend(preamble_ids)
@@ -112,17 +146,16 @@ class ClassOnePromptBuilder:
 
         for q_id, q in questions.items():
             if isinstance(q, NoulQuestion):
-                q_text = f"<|noul_start|>\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n<|noul_end|>\n"
+                q_text = f"{d_noul_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n{d_noul_end}\n"
                 seg_ids = self.tokenizer.encode(q_text, add_special_tokens=False, return_tensors=None)
                 start_offset = len(current_ids)
                 current_ids.extend(seg_ids)
                 text_parts.append(q_text)
 
-                # Locate <|noul_end|> token position in this segment
+                # Locate noul_end token position in this segment
                 end_tok_id = self.special_token_ids["<|noul_end|>"]
                 end_indices = [idx for idx, tid in enumerate(seg_ids) if tid == end_tok_id]
                 if not end_indices:
-                    # Fallback to the last token in segment
                     query_idx = len(current_ids) - 1
                 else:
                     query_idx = start_offset + end_indices[-1]
@@ -135,7 +168,7 @@ class ClassOnePromptBuilder:
 
             elif isinstance(q, ChoiceQuestion):
                 # Choice preamble
-                choice_header = f"<|choice_start|>\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
+                choice_header = f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
                 header_ids = self.tokenizer.encode(choice_header, add_special_tokens=False, return_tensors=None)
                 current_ids.extend(header_ids)
                 text_parts.append(choice_header)
@@ -146,7 +179,7 @@ class ClassOnePromptBuilder:
 
                 for opt_key, opt_desc in q.criteria.items():
                     opt_keys.append(opt_key)
-                    opt_text = f"<|opt_start|>\nKey: {opt_key}\nCriteria: {opt_desc}\n<|opt_end|>\n"
+                    opt_text = f"{d_opt_start}\nKey: {opt_key}\nCriteria: {opt_desc}\n{d_opt_end}\n"
                     opt_ids = self.tokenizer.encode(opt_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
                     current_ids.extend(opt_ids)
@@ -161,7 +194,7 @@ class ClassOnePromptBuilder:
                     else:
                         opt_indices.append(start_offset + end_idx[-1])
 
-                choice_footer = "<|choice_end|>\n"
+                choice_footer = f"{d_choice_end}\n"
                 footer_ids = self.tokenizer.encode(choice_footer, add_special_tokens=False, return_tensors=None)
                 start_offset = len(current_ids)
                 current_ids.extend(footer_ids)
@@ -181,7 +214,7 @@ class ClassOnePromptBuilder:
                 )
 
             elif isinstance(q, ScoreQuestion):
-                score_header = f"<|score_start|>\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
+                score_header = f"{d_score_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
                 header_ids = self.tokenizer.encode(score_header, add_special_tokens=False, return_tensors=None)
                 current_ids.extend(header_ids)
                 text_parts.append(score_header)
@@ -193,7 +226,7 @@ class ClassOnePromptBuilder:
                 for idx, level_desc in enumerate(q.criteria):
                     level_key = str(idx + 1)
                     level_keys.append(level_key)
-                    level_text = f"<|level_start|>\nLevel: {level_key}\nCriteria: {level_desc}\n<|level_end|>\n"
+                    level_text = f"{d_level_start}\nLevel: {level_key}\nCriteria: {level_desc}\n{d_level_end}\n"
                     level_ids = self.tokenizer.encode(level_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
                     current_ids.extend(level_ids)
@@ -208,7 +241,7 @@ class ClassOnePromptBuilder:
                     else:
                         level_indices.append(start_offset + end_idx[-1])
 
-                score_footer = "<|score_end|>\n"
+                score_footer = f"{d_score_end}\n"
                 footer_ids = self.tokenizer.encode(score_footer, add_special_tokens=False, return_tensors=None)
                 start_offset = len(current_ids)
                 current_ids.extend(footer_ids)

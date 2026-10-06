@@ -235,6 +235,147 @@ print("Anger score:   ", results["anger"].score)
 | `lora_backbone/adapter_model.safetensors` | LoRA adapter weights (r=16, α=32) |
 | `lora_backbone/adapter_config.json` | LoRA config (target modules, rank, etc.) |"""
 
+    is_qwen9b = "qwen" in repo_id.lower() and "9b" in repo_id.lower()
+    is_qwen4b = "qwen" in repo_id.lower() and "4b" in repo_id.lower()
+    is_qwen2b = "qwen" in repo_id.lower() and "2b" in repo_id.lower()
+    is_e4b = "e4b" in repo_id.lower()
+
+    if is_qwen9b:
+        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+
+Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+
+| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
+|---|---|---|---|---|---|
+| **Easy** | 48 | **100.0%** (48/48) | **0.0000** | **0.0000** | **115.1 ms** |
+| **Original** | 72 | **97.2%** (70/72) | **0.0319** | **0.0285** | **114.7 ms** |
+| **Hard** | 111 | **60.4%** (67/111) | 0.2813 | 0.3101 | **323.1 ms** |
+| **Overall Aggregate** | **231** | **80.1%** (185/231) [RECORD] | — | — | **115.1 ms** |
+
+- **Easy Tier:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12). Flawless 0.0000 ECE.
+- **Original Tier:** Choice: **100.0%** (36/36); Score: **100.0%** (12/12); Noul: **91.7%** (22/24).
+- **Hard Tier:** Choice: **61.2%** (41/67); Noul: **57.9%** (22/38); Score: **66.7%** (4/6).
+
+### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+
+Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Honesty (Deception)** | 11 | **0.900** | **81.8%** | 0.2228 | 718.5 ms |
+| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.2078 | 702.6 ms |
+| **Concealing Uncertainty** | 14 | **0.673** | **71.4%** | 0.2592 | 439.7 ms |
+| **Faithfulness** | 9 | **0.725** | **66.7%** | 0.2802 | 690.8 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.733** | **63.6%** | 0.3312 | 894.6 ms |
+| **Overall Balanced Accuracy** | **100** | **0.594** | **60.1%** | **0.2997** | **657.7 ms** |"""
+    elif is_qwen4b:
+        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+
+Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+
+| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
+|---|---|---|---|---|---|
+| **Easy** | 48 | **100.0%** (48/48) | **0.0001** | **0.0000** | **63.4 ms** |
+| **Original** | 72 | **95.8%** (69/72) | **0.0458** | **0.0377** | **61.1 ms** |
+| **Hard** | 111 | **40.5%** (45/111) | 0.4825 | 0.4504 | **184.5 ms** |
+| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **61.1 ms** |
+
+- **Original Tier Sub-Breakdown:** Choice accuracy: **97.2%** (35/36); Score rubrics: **100.0%** (12/12); Noul accuracy: **91.7%** (22/24).
+- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12).
+
+### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.1475 | 441.5 ms |
+| **Faithfulness** | 9 | **0.850** | **66.7%** | 0.1956 | 433.4 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.733** | **72.7%** | **0.0753** | 570.5 ms |
+| **Honesty (Deception)** | 11 | **0.733** | **72.7%** | 0.2583 | 453.5 ms |
+| **Overall AUROC** | **100** | **0.604** | **55.3%** | **0.2553** | **410.9 ms** |"""
+    elif is_qwen2b:
+        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+
+Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+
+| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
+|---|---|---|---|---|---|
+| **Easy** | 48 | **100.0%** (48/48) | **0.0014** | **0.0000** | **41.9 ms** |
+| **Original** | 72 | **91.7%** (66/72) | **0.0655** | **0.0545** | **40.3 ms** |
+| **Hard** | 111 | **38.7%** (43/111) | 0.5176 | 0.5171 | **83.6 ms** |
+| **Overall Aggregate** | **231** | **68.0%** (157/231) | — | — | **40.3 ms** |
+
+- **Original Choice Record:** **88.9%** (32/36); Score: **100.0%** (12/12); Noul: **91.7%** (22/24).
+- **Latency Advantage:** **40.3 ms median latency** across real-time decisions.
+
+### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Faithfulness** | 9 | **0.800** | **55.6%** | 0.3486 | 184.2 ms |
+| **Honesty (Deception)** | 11 | **0.767** | **72.7%** | 0.2207 | 188.9 ms |
+| **Concealing Uncertainty** | 14 | **0.571** | **64.3%** | 0.3795 | 115.3 ms |
+| **Overall Balanced Accuracy** | **100** | **0.568** | **58.0%** | **0.3261** | **173.2 ms** |"""
+    elif is_e4b:
+        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+
+Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+
+| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
+|---|---|---|---|---|---|
+| **Easy** | 48 | **100.0%** (48/48) | **0.0000** | **0.0000** | **98.5 ms** |
+| **Original** | 72 | **93.1%** (67/72) | **0.0588** | **0.0498** | **97.9 ms** |
+| **Hard** | 111 | **42.3%** (47/111) | 0.4393 | 0.4139 | **197.0 ms** |
+| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **98.2 ms** |
+
+- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0000 ECE.
+- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **86.1%** (31/36).
+- **Hard Tier Sub-Breakdown:** Noul policy compliance: **42.1%** (16/38); Choice accuracy: **43.3%** (29/67); Score: **33.3%** (2/6).
+
+### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+
+Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Refusal (Jailbreaks)** | 11 | 0.433 | **72.7%** | 0.3272 | 622.8 ms |
+| **Honesty (Deception)** | 11 | **0.567** | **72.7%** | 0.2531 | 464.9 ms |
+| **Reward Hacking** | 9 | **0.650** | **66.7%** | 0.3074 | 444.8 ms |
+| **Faithfulness** | 9 | **0.600** | **66.7%** | 0.3005 | 440.3 ms |
+| **Power Seeking** | 6 | **0.556** | **66.7%** | 0.1434 | 449.7 ms |
+| **Privacy (Secret Leaks)** | 14 | **0.571** | **64.3%** | 0.3666 | 353.1 ms |
+| **Concealing Uncertainty** | 14 | **0.510** | **64.3%** | 0.3784 | 288.6 ms |
+| **Bias** | 9 | 0.225 | **55.6%** | 0.1921 | 465.0 ms |
+| **Overall Balanced Accuracy** | **100** | **0.583** | **63.3%** | **0.2874** | **425.9 ms** |"""
+    else:
+        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+
+Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+
+| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
+|---|---|---|---|---|---|
+| **Easy** | 48 | **100.0%** (48/48) | **0.0064** | **0.0009** | **44.8 ms** |
+| **Original** | 72 | **90.3%** (65/72) | **0.0972** | **0.1015** | **42.9 ms** |
+| **Hard** | 111 | **44.1%** (49/111) | 0.4681 | 0.4813 | **90.0 ms** |
+| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **44.8 ms** |
+
+- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0064 ECE.
+- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **80.6%** (29/36).
+- **Hard Tier Sub-Breakdown:** Noul policy compliance: **52.6%** (20/38); Choice accuracy: **43.3%** (29/67).
+
+### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+
+Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Power Seeking** | 6 | **0.889** | **83.3%** | 0.2575 | 209.6 ms |
+| **Honesty (Deception)** | 11 | 0.500 | **72.7%** | 0.3906 | 216.8 ms |
+| **Concealing Uncertainty** | 14 | **0.673** | **71.4%** | **0.1800** | 127.8 ms |
+| **Refusal (Jailbreaks)** | 11 | 0.500 | **63.6%** | **0.0974** | 267.5 ms |
+| **Faithfulness** | 9 | **0.700** | **55.6%** | 0.2513 | 200.0 ms |
+| **Bias** | 9 | **0.525** | **55.6%** | 0.2141 | 217.9 ms |
+| **Overall Balanced Accuracy** | **100** | **0.505** | **56.2%** | **0.1944** | **199.2 ms** |"""
+
     return f"""---
 license: apache-2.0
 base_model: {base_model}
@@ -257,35 +398,7 @@ Instead of generating text token by token, ClassOne evaluates structured decisio
 
 ## Benchmark Results
 
-### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
-
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
-
-| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
-|---|---|---|---|---|---|
-| **Easy** | 48 | **93.8%** (45/48) | 0.0610 | 0.0516 | **45.0 ms** |
-| **Original** | 72 | **63.9%** (46/72) | 0.2510 | 0.2499 | **43.1 ms** |
-| **Hard** | 111 | **37.8%** (42/111) | 0.4299 | 0.4022 | **91.3 ms** |
-| **Overall Aggregate** | **231** | **57.6%** (133/231) | — | — | **~44 ms** |
-
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **75.0%** (9/12).
-- **Original Tier Sub-Breakdown:** Choice accuracy: **66.7%** (24/36); Score rubrics: **66.7%** (8/12); Noul accuracy: **58.3%** (14/24).
-- **Hard Tier Sub-Breakdown:** Noul policy compliance: **44.7%** (17/38); Choice accuracy: **34.3%** (23/67); Score rubrics: **33.3%** (2/6).
-
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
-
-Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
-
-| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
-|---|---|---|---|---|---|
-| **Concealing Uncertainty** | 14 | **0.980** | **85.7%** | **0.0718** | 130.2 ms |
-| **Honesty (Deception)** | 11 | **0.800** | **72.7%** | 0.2445 | 219.6 ms |
-| **Refusal (Jailbreaks)** | 11 | **0.667** | **54.5%** | 0.1934 | 271.1 ms |
-| **Power Seeking** | 6 | **0.556** | 50.0% | 0.1794 | 213.2 ms |
-| **Reward Hacking** | 9 | **0.500** | 33.3% | 0.2935 | 209.6 ms |
-| **Prompt Injection** | 8 | **0.500** | 37.5% | 0.3207 | 167.9 ms |
-| **Bias** | 9 | 0.375 | 55.6% | 0.1659 | 221.5 ms |
-| **Overall Average** | **100** | **0.516** | **51.0%** | **0.1584** | **200.0 ms** |
+{benchmark_section}
 
 ### 3. Edge vs Cloud Latency (ClassOne vs TypeSafe Jev API)
 

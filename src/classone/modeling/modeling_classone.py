@@ -250,12 +250,19 @@ class ClassOneModel(PreTrainedModel):
             if torch_dtype is not None:
                 kwargs["torch_dtype"] = torch_dtype
 
+            cpu_quantize_8bit = False
             if quantization:
                 from transformers import BitsAndBytesConfig
 
                 quant_str = str(quantization).lower().replace("-", "")
-                if quant_str in ("8bit", "int8"):
-                    kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+                if quant_str in ("8bit", "int8", "q8"):
+                    is_cpu_target = device == "cpu" or (device is None and not torch.cuda.is_available())
+                    if is_cpu_target:
+                        cpu_quantize_8bit = True
+                        if "torch_dtype" not in kwargs:
+                            kwargs["torch_dtype"] = torch.bfloat16
+                    else:
+                        kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
                 elif quant_str in ("4bit", "nf4", "int4"):
                     compute_dtype = torch_dtype or torch.float16
                     kwargs["quantization_config"] = BitsAndBytesConfig(
@@ -267,12 +274,37 @@ class ClassOneModel(PreTrainedModel):
                 else:
                     raise ValueError(f"Unsupported quantization: {quantization}. Choose '8bit' or '4bit'.")
 
-                if "device_map" not in kwargs and device is not None:
+                if "device_map" not in kwargs and device is not None and not cpu_quantize_8bit:
                     kwargs["device_map"] = str(device)
-                elif "device_map" not in kwargs:
+                elif "device_map" not in kwargs and not cpu_quantize_8bit:
                     kwargs["device_map"] = "auto"
 
             backbone = AutoModel.from_pretrained(model_name, **kwargs)
+
+            if cpu_quantize_8bit:
+                if hasattr(backbone, "vision_tower"):
+                    backbone.vision_tower = None
+                if hasattr(backbone, "audio_tower"):
+                    backbone.audio_tower = None
+                if hasattr(backbone, "get_input_embeddings"):
+                    backbone.get_input_embeddings().float()
+                if hasattr(backbone, "language_model") and hasattr(backbone.language_model, "per_layer_model_projection"):
+                    backbone.language_model.per_layer_model_projection.float()
+
+                layers_container = None
+                if hasattr(backbone, "language_model") and hasattr(backbone.language_model, "layers"):
+                    layers_container = backbone.language_model.layers
+                elif hasattr(backbone, "layers"):
+                    layers_container = backbone.layers
+
+                if layers_container is not None:
+                    for i, layer in enumerate(layers_container):
+                        layer.float()
+                        layers_container[i] = torch.ao.quantization.quantize_dynamic(
+                            layer, {torch.nn.Linear}, dtype=torch.qint8
+                        )
+                else:
+                    backbone = torch.ao.quantization.quantize_dynamic(backbone, {torch.nn.Linear}, dtype=torch.qint8)
 
         # Resize token embeddings if tokenizer includes ClassOne delimiter tokens
         if tokenizer is not None and hasattr(backbone, "resize_token_embeddings"):

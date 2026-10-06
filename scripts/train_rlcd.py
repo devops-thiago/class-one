@@ -137,6 +137,13 @@ def parse_args():
         default=None,
         help="Path to pre-trained classone_heads.pt file to initialize decision heads",
     )
+    parser.add_argument(
+        "--quantization",
+        type=str,
+        default=None,
+        choices=["4bit", "8bit", "nf4"],
+        help="Quantization format for base model weights ('4bit' or '8bit')",
+    )
     return parser.parse_args()
 
 
@@ -180,6 +187,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
                 tokenizer=tokenizer,
                 device=device,
                 torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+                quantization=args.quantization,
             )
         except Exception as exc:
             if is_main_process:

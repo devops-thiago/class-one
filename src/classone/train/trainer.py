@@ -97,6 +97,14 @@ class ClassOneTrainer:
             bias="none",
         )
 
+        # For quantized base models, ensure all base weights are frozen before adapter injection
+        is_quantized = getattr(self.model.backbone, "is_loaded_in_8bit", False) or getattr(
+            self.model.backbone, "is_loaded_in_4bit", False
+        )
+        if is_quantized:
+            for p in self.model.backbone.parameters():
+                p.requires_grad = False
+
         # Apply LoRA to the backbone
         self.model.backbone = get_peft_model(self.model.backbone, lora_config)
 
