@@ -78,6 +78,13 @@ class ChoiceAnswer(BaseModel):
     choice: str
     probabilities: dict[str, float]
     confidence: float = Field(..., ge=0.0, le=1.0)
+    is_decisive: bool = True
+    margin: float = 1.0
+
+    @property
+    def is_ambiguous(self) -> bool:
+        """True if the decision lacks actionable confidence above chance (confidence < 0.15)."""
+        return not self.is_decisive
 
 
 class ScoreAnswer(BaseModel):
@@ -85,6 +92,13 @@ class ScoreAnswer(BaseModel):
     score: float
     probabilities: dict[str, float]
     confidence: float = Field(..., ge=0.0, le=1.0)
+    is_decisive: bool = True
+    margin: float = 1.0
+
+    @property
+    def is_ambiguous(self) -> bool:
+        """True if the score outcome lacks actionable confidence above chance (confidence < 0.15)."""
+        return not self.is_decisive
 
 
 QuestionPrimitive = Union[Noul, Choice, Score]
@@ -122,18 +136,34 @@ class ClassOneResponse:
                 self.nouls[q_id] = noul_ans
                 self.answers[q_id] = noul_ans
             elif ans_type == "choice":
+                probs_vals = sorted(val.get("probabilities", {}).values(), reverse=True)
+                calc_margin = float(probs_vals[0] - probs_vals[1]) if len(probs_vals) > 1 else 1.0
+                conf = val["confidence"]
+                is_decisive = val.get("is_decisive", conf >= 0.15)
+                margin = val.get("margin", calc_margin)
+
                 choice_ans = ChoiceAnswer(
                     choice=val["choice"],
                     probabilities=val["probabilities"],
-                    confidence=val["confidence"],
+                    confidence=conf,
+                    is_decisive=is_decisive,
+                    margin=round(float(margin), 4),
                 )
                 self.choices[q_id] = choice_ans
                 self.answers[q_id] = choice_ans
             elif ans_type == "score":
+                probs_vals = sorted(val.get("probabilities", {}).values(), reverse=True)
+                calc_margin = float(probs_vals[0] - probs_vals[1]) if len(probs_vals) > 1 else 1.0
+                conf = val["confidence"]
+                is_decisive = val.get("is_decisive", conf >= 0.15)
+                margin = val.get("margin", calc_margin)
+
                 score_ans = ScoreAnswer(
                     score=val["score"],
                     probabilities=val["probabilities"],
-                    confidence=val["confidence"],
+                    confidence=conf,
+                    is_decisive=is_decisive,
+                    margin=round(float(margin), 4),
                 )
                 self.scores[q_id] = score_ans
                 self.answers[q_id] = score_ans

@@ -322,14 +322,51 @@ class ClassOneModel(PreTrainedModel):
 
         return model
 
+    def build_position_invariant_mask(
+        self,
+        packed: PackedSequence,
+        device: torch.device,
+        dtype: torch.dtype = torch.bfloat16,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Builds a 4D block-diagonal attention mask and aligned position IDs.
+
+        Prevents candidate options from causally attending to earlier options in the prompt,
+        eliminating option-order recency bias.
+        """
+        seq_len = packed.input_ids.shape[1]
+        causal_2d = torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=device))
+        pos_ids = torch.arange(seq_len, dtype=torch.long, device=device)
+
+        for q_id, span in packed.questions.items():
+            spans = getattr(span, "option_token_spans", [])
+            if len(spans) > 1:
+                base_pos = spans[0][0]
+                # Option isolation: mask cross-option attention
+                for j in range(len(spans)):
+                    s_j, e_j = spans[j]
+                    # Symmetrize position IDs across options
+                    pos_ids[s_j:e_j] = base_pos + torch.arange(e_j - s_j, dtype=torch.long, device=device)
+                    for i in range(len(spans)):
+                        if i != j:
+                            s_i, e_i = spans[i]
+                            causal_2d[s_j:e_j, s_i:e_i] = False
+
+        mask_4d = torch.where(causal_2d, 0.0, float("-1e9")).to(dtype=dtype)[None, None, :, :]
+        return mask_4d, pos_ids.unsqueeze(0)
+
     def extract_hidden_states(
-        self, input_ids: torch.Tensor, attention_mask: torch.Tensor | None = None
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Runs the backbone forward pass and retrieves sequence hidden states."""
         target_device = self.device
         input_ids = input_ids.to(target_device)
         if attention_mask is not None:
             attention_mask = attention_mask.to(target_device)
+        if position_ids is not None:
+            position_ids = position_ids.to(target_device)
 
         if hasattr(self, "embed"):
             # Standalone mode: pass padding mask to prevent attention over padded tokens
@@ -339,7 +376,10 @@ class ClassOneModel(PreTrainedModel):
             return self.backbone(x, src_key_padding_mask=padding_mask)
         else:
             # Hugging Face backbone
-            outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+            kwargs = {}
+            if position_ids is not None:
+                kwargs["position_ids"] = position_ids
+            outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
             if hasattr(outputs, "last_hidden_state"):
                 hidden = outputs.last_hidden_state
             else:
@@ -354,6 +394,7 @@ class ClassOneModel(PreTrainedModel):
         self,
         batch: list[PackedSequence],
         pad_token_id: int = 0,
+        position_invariant: bool = False,
     ) -> list[dict[str, Result]]:
         """Evaluates a batch of packed sequences simultaneously in a single batched forward pass.
 
@@ -381,9 +422,22 @@ class ClassOneModel(PreTrainedModel):
             batched_attention_mask[b, :seq_len] = p.attention_mask[0].to(self.device)
 
         with torch.no_grad():
-            hidden_states = self.extract_hidden_states(
-                batched_input_ids, batched_attention_mask
-            )  # [batch_size, max_len, hidden_size]
+            if len(batch) == 1 and position_invariant and not hasattr(self, "embed"):
+                has_options = any(
+                    len(getattr(span, "option_token_spans", [])) > 1 for span in batch[0].questions.values()
+                )
+                if has_options:
+                    head_dtype = next(self.noul_head.parameters()).dtype
+                    mask_4d, pos_ids = self.build_position_invariant_mask(batch[0], self.device, dtype=head_dtype)
+                    hidden_states = self.extract_hidden_states(
+                        batched_input_ids, attention_mask=mask_4d, position_ids=pos_ids
+                    )
+                else:
+                    hidden_states = self.extract_hidden_states(batched_input_ids, batched_attention_mask)
+            else:
+                hidden_states = self.extract_hidden_states(
+                    batched_input_ids, batched_attention_mask
+                )  # [batch_size, max_len, hidden_size]
 
             head_dtype = next(self.noul_head.parameters()).dtype
             batch_answers: list[dict[str, Result]] = []
@@ -421,10 +475,17 @@ class ClassOneModel(PreTrainedModel):
 
                         conf = 0.0 if math.isnan(conf) else max(0.0, min(1.0, conf))
 
+                        # Margin: delta between top-1 and top-2 candidate probabilities
+                        sorted_probs = sorted(probs_list, reverse=True)
+                        margin = float(sorted_probs[0] - sorted_probs[1]) if len(sorted_probs) > 1 else 1.0
+                        is_decisive = conf >= 0.15
+
                         answers[q_id] = ChoiceResult(
                             choice=best_key,
                             probabilities=prob_dict,
                             confidence=round(conf, 4),
+                            is_decisive=is_decisive,
+                            margin=round(margin, 4),
                         )
 
                     elif span.question_type == "score":
@@ -445,16 +506,23 @@ class ClassOneModel(PreTrainedModel):
 
                         conf = 0.0 if math.isnan(conf) else max(0.0, min(1.0, conf))
 
+                        # Margin: delta between top-1 and top-2 level probabilities
+                        sorted_probs = sorted(probs_list, reverse=True)
+                        margin = float(sorted_probs[0] - sorted_probs[1]) if len(sorted_probs) > 1 else 1.0
+                        is_decisive = conf >= 0.15
+
                         answers[q_id] = ScoreResult(
                             score=round(float(expected_score.item()), 4),
                             probabilities=prob_dict,
                             confidence=round(conf, 4),
+                            is_decisive=is_decisive,
+                            margin=round(margin, 4),
                         )
 
                 batch_answers.append(answers)
 
             return batch_answers
 
-    def evaluate_packed(self, packed: PackedSequence) -> dict[str, Result]:
+    def evaluate_packed(self, packed: PackedSequence, position_invariant: bool = False) -> dict[str, Result]:
         """Evaluates all questions in a packed sequence in a single forward pass."""
-        return self.evaluate_batch([packed])[0]
+        return self.evaluate_batch([packed], position_invariant=position_invariant)[0]

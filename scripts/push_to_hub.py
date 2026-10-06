@@ -263,13 +263,14 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **95.8%** (46/48) | 0.0821 | 0.0435 | **45.5 ms** |
-| **Original** | 72 | **59.7%** (43/72) | 0.1606 | 0.2547 | **42.7 ms** |
-| **Hard** | 111 | **33.3%** (37/111) | 0.3553 | 0.3695 | **91.9 ms** |
-| **Overall Aggregate** | **231** | **54.5%** (126/231) | — | — | **~44 ms** |
+| **Easy** | 48 | **93.8%** (45/48) | 0.0610 | 0.0516 | **45.0 ms** |
+| **Original** | 72 | **63.9%** (46/72) | 0.2510 | 0.2499 | **43.1 ms** |
+| **Hard** | 111 | **37.8%** (42/111) | 0.4299 | 0.4022 | **91.3 ms** |
+| **Overall Aggregate** | **231** | **57.6%** (133/231) | — | — | **~44 ms** |
 
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **97.2%** (35/36); Noul policy accuracy: **91.7%** (11/12).
-- **Original Tier Sub-Breakdown:** Choice accuracy: **63.9%** (23/36); Noul accuracy: **58.3%** (14/24); Score rubrics: **50.0%** (6/12).
+- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **75.0%** (9/12).
+- **Original Tier Sub-Breakdown:** Choice accuracy: **66.7%** (24/36); Score rubrics: **66.7%** (8/12); Noul accuracy: **58.3%** (14/24).
+- **Hard Tier Sub-Breakdown:** Noul policy compliance: **44.7%** (17/38); Choice accuracy: **34.3%** (23/67); Score rubrics: **33.3%** (2/6).
 
 ### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
@@ -277,13 +278,14 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **Privacy Leaks** | 14 | **0.714** | 57.1% | 0.2090 | 161.7 ms |
-| **Honesty (Deception)** | 11 | **0.700** | 54.5% | 0.3747 | 217.2 ms |
-| **Concealing Uncertainty** | 14 | **0.633** | **71.4%** | **0.0494** | 129.3 ms |
-| **Bias** | 9 | **0.575** | 55.6% | 0.1997 | 218.1 ms |
-| **Prompt Injection** | 8 | **0.562** | **75.0%** | 0.2516 | 166.8 ms |
-| **Power Seeking** | 6 | **0.444** | 50.0% | 0.2762 | 212.1 ms |
-| **Overall Average** | **100** | **0.516** | **51.0%** | **0.1542** | **198.6 ms** |
+| **Concealing Uncertainty** | 14 | **0.980** | **85.7%** | **0.0718** | 130.2 ms |
+| **Honesty (Deception)** | 11 | **0.800** | **72.7%** | 0.2445 | 219.6 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.667** | **54.5%** | 0.1934 | 271.1 ms |
+| **Power Seeking** | 6 | **0.556** | 50.0% | 0.1794 | 213.2 ms |
+| **Reward Hacking** | 9 | **0.500** | 33.3% | 0.2935 | 209.6 ms |
+| **Prompt Injection** | 8 | **0.500** | 37.5% | 0.3207 | 167.9 ms |
+| **Bias** | 9 | 0.375 | 55.6% | 0.1659 | 221.5 ms |
+| **Overall Average** | **100** | **0.516** | **51.0%** | **0.1584** | **200.0 ms** |
 
 ### 3. Edge vs Cloud Latency (ClassOne vs TypeSafe Jev API)
 

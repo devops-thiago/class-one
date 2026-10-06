@@ -84,6 +84,12 @@ class ChoiceResult(BaseModel):
         description="Probability distribution across all available choices.",
     )
     confidence: float = Field(..., ge=0.0, le=1.0, description="Calibrated decision confidence.")
+    is_decisive: bool = Field(
+        default=True, description="Whether the decision has actionable certainty above random chance."
+    )
+    margin: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Delta between top-1 and top-2 candidate probabilities."
+    )
 
 
 class ScoreResult(BaseModel):
@@ -96,6 +102,12 @@ class ScoreResult(BaseModel):
         description="Probability distribution across each ordered rubric level.",
     )
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the score outcome.")
+    is_decisive: bool = Field(
+        default=True, description="Whether the rating has actionable certainty above random chance."
+    )
+    margin: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Delta between top-1 and top-2 candidate probabilities."
+    )
 
 
 Result = Union[NoulResult, ChoiceResult, ScoreResult]

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import torch
+import torch.nn.functional as F
 from peft import LoraConfig, PeftModel, get_peft_model
 
 from classone.modeling.loss import RLCDLoss
@@ -46,7 +47,7 @@ class ClassOneTrainer:
     ):
         self.model = model
         self.prompt_builder = prompt_builder
-        self.loss_fn = loss_fn or RLCDLoss(brier_weight=0.5, log_weight=1.0)
+        self.loss_fn = loss_fn or RLCDLoss(brier_weight=0.5, log_weight=1.0, focal_gamma=2.0)
         self.lr = lr
         self.weight_decay = weight_decay
         self.device = torch.device(device) if device else self.model.device
@@ -111,6 +112,26 @@ class ClassOneTrainer:
         # Re-initialize optimizer with updated trainable parameters preserving initial lr & decay
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
         self.optimizer = torch.optim.AdamW(trainable_params, lr=self.lr, weight_decay=self.weight_decay)
+        self.scheduler = None
+
+    def setup_scheduler(self, total_steps: int, warmup_steps: int = 150):
+        """Sets up a learning rate scheduler with linear warmup and cosine decay."""
+        from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+
+        if total_steps <= warmup_steps:
+            warmup_steps = max(1, total_steps // 10)
+
+        warmup_sched = LinearLR(self.optimizer, start_factor=0.1, total_iters=warmup_steps)
+        cosine_sched = CosineAnnealingLR(
+            self.optimizer,
+            T_max=max(1, total_steps - warmup_steps),
+            eta_min=self.lr * 0.1,
+        )
+        self.scheduler = SequentialLR(
+            self.optimizer,
+            schedulers=[warmup_sched, cosine_sched],
+            milestones=[warmup_steps],
+        )
 
     def train_step(
         self,
@@ -141,7 +162,6 @@ class ClassOneTrainer:
         for item, packed in packed_batch:
             input_ids = packed.input_ids.to(self.device)
             attention_mask = packed.attention_mask.to(self.device)
-
             hidden_states = self.model.extract_hidden_states(input_ids=input_ids, attention_mask=attention_mask)
             seq_hidden = hidden_states[0]
             head_dtype = next(self.model.noul_head.parameters()).dtype
@@ -216,6 +236,8 @@ class ClassOneTrainer:
         elif world_size > 1:
             self.sync_gradients(world_size)
         self.optimizer.step()
+        if hasattr(self, "scheduler") and self.scheduler is not None:
+            self.scheduler.step()
         self.optimizer.zero_grad(set_to_none=True)
 
         return {
@@ -353,6 +375,16 @@ class ClassOneTrainer:
             if count > 0:
                 (calib_loss / count).backward()
                 temp_optimizer.step()
+                with torch.no_grad():
+                    for raw_param, (min_t, max_t) in [
+                        (self.model.noul_head.temperature_raw, (0.45, 0.60)),
+                        (self.model.choice_head.temperature_raw, (0.45, 0.60)),
+                        (self.model.score_head.choice_evaluator.temperature_raw, (0.55, 0.65)),
+                    ]:
+                        curr_t = F.softplus(raw_param) + 0.1
+                        clamped_t = torch.clamp(curr_t, min=min_t, max=max_t)
+                        new_raw = torch.log(torch.exp(clamped_t - 0.1) - 1.0 + 1e-6)
+                        raw_param.copy_(new_raw)
 
         # Accurately restore original gradient states
         for name, p in self.model.named_parameters():

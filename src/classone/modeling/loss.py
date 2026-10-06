@@ -86,7 +86,7 @@ def expected_calibration_error(probs: torch.Tensor, targets: torch.Tensor, n_bin
 class RLCDLoss(nn.Module):
     """Reinforcement Learning for Calibrated Decisions (RLCD) multi-objective loss.
 
-    Combines Logarithmic Scoring (proper scoring rule rewarding true likelihood),
+    Combines Focal Logarithmic Scoring (proper scoring rule with focal modulation down-weighting easy samples),
     Brier Score (penalizing probability deviation), and Contrastive Margin Penalty.
     """
 
@@ -96,6 +96,7 @@ class RLCDLoss(nn.Module):
         log_weight: float = 1.0,
         margin_weight: float = 0.5,
         margin_threshold: float = 1.0,
+        focal_gamma: float = 2.0,
         eps: float = 1e-6,
     ):
         super().__init__()
@@ -103,6 +104,7 @@ class RLCDLoss(nn.Module):
         self.log_weight = log_weight
         self.margin_weight = margin_weight
         self.margin_threshold = margin_threshold
+        self.focal_gamma = focal_gamma
         self.eps = eps
 
     def forward_binary(
@@ -116,8 +118,15 @@ class RLCDLoss(nn.Module):
         target_f = target.view(-1).float()
         prob_clamped = torch.clamp(prob_f, self.eps, 1.0 - self.eps)
 
-        # Binary log loss
-        log_loss = -(target_f * torch.log(prob_clamped) + (1.0 - target_f) * torch.log(1.0 - prob_clamped)).mean()
+        # Binary focal log loss: -(target * (1-p)^gamma * log(p) + (1-target) * p^gamma * log(1-p))
+        if self.focal_gamma > 0.0:
+            p_t = target_f * prob_clamped + (1.0 - target_f) * (1.0 - prob_clamped)
+            focal_weight = torch.pow(1.0 - p_t, self.focal_gamma)
+            log_loss = -(
+                focal_weight * (target_f * torch.log(prob_clamped) + (1.0 - target_f) * torch.log(1.0 - prob_clamped))
+            ).mean()
+        else:
+            log_loss = -(target_f * torch.log(prob_clamped) + (1.0 - target_f) * torch.log(1.0 - prob_clamped)).mean()
 
         # Un-clamped Brier loss for pure proper scoring
         brier = torch.mean((prob_f - target_f) ** 2)
@@ -138,21 +147,34 @@ class RLCDLoss(nn.Module):
         targets: torch.Tensor,
         logits: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Loss for Choice / Score decisions."""
+        """Loss for Choice / Score decisions.
+
+        Supports discrete class indices (1D LongTensor) or soft distribution targets
+        (2D FloatTensor, e.g. uniform [1/K, ...] for ambiguous/OOD inputs).
+        """
         num_classes = probs.shape[-1]
         probs_f = probs.float()
-        one_hot = F.one_hot(targets, num_classes=num_classes).float()
+        if targets.dim() == 2 and targets.shape[-1] == num_classes and targets.is_floating_point():
+            target_dist = targets.float()
+            is_soft = True
+        else:
+            target_dist = F.one_hot(targets, num_classes=num_classes).float()
+            is_soft = False
 
-        # Log loss computed with stable FP32 clamping
+        # Log loss computed with stable FP32 clamping and optional focal modulation
         probs_clamped = torch.clamp(probs_f, self.eps, 1.0 - self.eps)
-        log_loss = -torch.sum(one_hot * torch.log(probs_clamped), dim=-1).mean()
+        if self.focal_gamma > 0.0:
+            focal_weight = torch.pow(1.0 - probs_clamped, self.focal_gamma)
+            log_loss = -torch.sum(target_dist * focal_weight * torch.log(probs_clamped), dim=-1).mean()
+        else:
+            log_loss = -torch.sum(target_dist * torch.log(probs_clamped), dim=-1).mean()
 
         # Normalized multiclass Brier score (0.5 * sum squared difference)
-        brier = 0.5 * torch.mean(torch.sum((probs_f - one_hot) ** 2, dim=-1))
+        brier = 0.5 * torch.mean(torch.sum((probs_f - target_dist) ** 2, dim=-1))
 
         loss = self.log_weight * log_loss + self.brier_weight * brier
 
-        if logits is not None and self.margin_weight > 0.0:
+        if logits is not None and self.margin_weight > 0.0 and not is_soft:
             logits_f = logits.float()
             if logits_f.dim() == 1:
                 logits_f = logits_f.unsqueeze(0)

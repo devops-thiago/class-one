@@ -112,3 +112,43 @@ async def test_async_client_integration():
         assert 0.0 <= response.nouls["is_auth"].noul <= 1.0
         assert "priority" in response.scores
         assert 1.0 <= response.scores["priority"].score <= 2.0
+
+
+def test_sdk_ambiguity_and_margin_helpers():
+    """Verifies that ChoiceAnswer and ScoreAnswer compute is_decisive, margin, and is_ambiguous correctly."""
+    from classone.sdk import ChoiceAnswer, ScoreAnswer
+
+    # 1. Decisive choice (high confidence, large margin)
+    decisive_choice = ChoiceAnswer(
+        choice="billing",
+        probabilities={"billing": 0.95, "tech": 0.05},
+        confidence=0.90,
+        is_decisive=True,
+        margin=0.90,
+    )
+    assert decisive_choice.is_decisive is True
+    assert decisive_choice.is_ambiguous is False
+    assert decisive_choice.margin == 0.90
+
+    # 2. Ambiguous choice (coin-flip, confidence 0.0, margin 0.0)
+    ambiguous_choice = ChoiceAnswer(
+        choice="billing",
+        probabilities={"billing": 0.50, "tech": 0.50},
+        confidence=0.0,
+        is_decisive=False,
+        margin=0.0,
+    )
+    assert ambiguous_choice.is_decisive is False
+    assert ambiguous_choice.is_ambiguous is True
+    assert ambiguous_choice.margin == 0.0
+
+    # 3. Decisive score
+    decisive_score = ScoreAnswer(
+        score=2.0,
+        probabilities={"low": 0.1, "urgent": 0.9},
+        confidence=0.80,
+        is_decisive=True,
+        margin=0.80,
+    )
+    assert decisive_score.is_decisive is True
+    assert decisive_score.is_ambiguous is False

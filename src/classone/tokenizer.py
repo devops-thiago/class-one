@@ -42,6 +42,7 @@ class QuestionSpans:
     query_token_idx: int
     option_keys: list[str] = field(default_factory=list)
     option_token_indices: list[int] = field(default_factory=list)
+    option_token_spans: list[tuple[int, int]] = field(default_factory=list)
 
 
 @dataclass
@@ -80,19 +81,34 @@ class ClassOnePromptBuilder:
         are constructed segment-by-segment.
         """
         state_str = self.serialize_state(state)
-
-        # Assemble full text representation
-        text_parts: list[str] = [f"<|state_start|>\n{state_str}\n<|state_end|>\n"]
-
-        question_spans_meta: dict[str, QuestionSpans] = {}
-
-        # Tokenize state prefix first
+        state_prefix = f"<|state_start|>\n{state_str}\n<|state_end|>\n"
         prefix_ids = self.tokenizer.encode(
-            text_parts[0],
+            state_prefix,
             add_special_tokens=True,
             return_tensors=None,
         )
-        current_ids: list[int] = list(prefix_ids)
+
+        question_spans_meta: dict[str, QuestionSpans] = {}
+
+        # For long context documents (>600 tokens), condition causal attention with a question preamble
+        text_parts: list[str] = []
+        current_ids: list[int] = []
+
+        if len(prefix_ids) > 600 and questions:
+            instructions_summary = "\n".join(
+                f"- [{qid}]: {getattr(q, 'instructions', '').strip()}" for qid, q in questions.items()
+            )
+            preamble_text = f"<|state_start|>\nTarget Objectives:\n{instructions_summary}\n<|state_end|>\n"
+            preamble_ids = self.tokenizer.encode(preamble_text, add_special_tokens=True, return_tensors=None)
+            text_parts.append(preamble_text)
+            current_ids.extend(preamble_ids)
+
+            state_only_ids = self.tokenizer.encode(state_prefix, add_special_tokens=False, return_tensors=None)
+            text_parts.append(state_prefix)
+            current_ids.extend(state_only_ids)
+        else:
+            text_parts.append(state_prefix)
+            current_ids.extend(prefix_ids)
 
         for q_id, q in questions.items():
             if isinstance(q, NoulQuestion):
@@ -126,6 +142,7 @@ class ClassOnePromptBuilder:
 
                 opt_keys: list[str] = []
                 opt_indices: list[int] = []
+                opt_spans: list[tuple[int, int]] = []
 
                 for opt_key, opt_desc in q.criteria.items():
                     opt_keys.append(opt_key)
@@ -133,6 +150,8 @@ class ClassOnePromptBuilder:
                     opt_ids = self.tokenizer.encode(opt_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
                     current_ids.extend(opt_ids)
+                    end_offset = len(current_ids)
+                    opt_spans.append((start_offset, end_offset))
                     text_parts.append(opt_text)
 
                     end_tok_id = self.special_token_ids["<|opt_end|>"]
@@ -158,6 +177,7 @@ class ClassOnePromptBuilder:
                     query_token_idx=query_idx,
                     option_keys=opt_keys,
                     option_token_indices=opt_indices,
+                    option_token_spans=opt_spans,
                 )
 
             elif isinstance(q, ScoreQuestion):
@@ -168,6 +188,7 @@ class ClassOnePromptBuilder:
 
                 level_keys: list[str] = []
                 level_indices: list[int] = []
+                level_spans: list[tuple[int, int]] = []
 
                 for idx, level_desc in enumerate(q.criteria):
                     level_key = str(idx + 1)
@@ -176,6 +197,8 @@ class ClassOnePromptBuilder:
                     level_ids = self.tokenizer.encode(level_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
                     current_ids.extend(level_ids)
+                    end_offset = len(current_ids)
+                    level_spans.append((start_offset, end_offset))
                     text_parts.append(level_text)
 
                     end_tok_id = self.special_token_ids["<|level_end|>"]
@@ -201,6 +224,7 @@ class ClassOnePromptBuilder:
                     query_token_idx=query_idx,
                     option_keys=level_keys,
                     option_token_indices=level_indices,
+                    option_token_spans=level_spans,
                 )
 
         full_text = "".join(text_parts)

@@ -131,6 +131,12 @@ def parse_args():
         default=True,
         help="Run post-hoc temperature calibration after training",
     )
+    parser.add_argument(
+        "--pretrained-heads",
+        type=str,
+        default=None,
+        help="Path to pre-trained classone_heads.pt file to initialize decision heads",
+    )
     return parser.parse_args()
 
 
@@ -187,6 +193,38 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
         lr=args.lr,
         device=device,
     )
+
+    # Load pre-trained decision heads if fine-tuning from an existing ClassOne checkpoint or local heads
+    if args.pretrained_heads and os.path.exists(args.pretrained_heads):
+        if is_main_process:
+            print(f"[*] Loading pre-trained decision heads from local file {args.pretrained_heads}...")
+        try:
+            heads_data = torch.load(args.pretrained_heads, map_location=device)
+            model.noul_head.load_state_dict(heads_data["noul_head"], strict=False)
+            model.choice_head.load_state_dict(heads_data["choice_head"], strict=False)
+            model.score_head.load_state_dict(heads_data["score_head"], strict=False)
+            if is_main_process:
+                print("[✓] Local pre-trained heads loaded successfully.")
+        except Exception as e:
+            if is_main_process:
+                print(f"[!] Warning: Failed to load local pre-trained heads: {e}")
+    elif args.model == "devops-thiago/classone-gemma4-e2b":
+        if is_main_process:
+            print(f"[*] Loading pre-trained decision heads from {args.model}...")
+        from huggingface_hub import hf_hub_download
+
+        try:
+            heads_path = hf_hub_download(args.model, "classone_heads.pt")
+            heads_data = torch.load(heads_path, map_location=device)
+            model.noul_head.load_state_dict(heads_data["noul_head"], strict=False)
+            model.choice_head.load_state_dict(heads_data["choice_head"], strict=False)
+            model.score_head.load_state_dict(heads_data["score_head"], strict=False)
+            if is_main_process:
+                print("[✓] Pre-trained heads loaded successfully.")
+        except Exception as e:
+            if is_main_process:
+                print(f"[!] Warning: Failed to load pre-trained heads: {e}")
+
     if args.model != "standalone":
         if is_main_process:
             print(f"[*] Attaching LoRA adapters (r={args.lora_r}, alpha={args.lora_alpha})...")
@@ -220,6 +258,9 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
         print("\n=== Starting RLCD Multi-GPU Fine-Tuning ===")
 
     # Training Loop
+    total_steps = len(train_loader) * args.epochs
+    trainer.setup_scheduler(total_steps=total_steps, warmup_steps=min(200, max(50, total_steps // 15)))
+
     t0_train = time.time()
     for epoch in range(1, args.epochs + 1):
         epoch_loss = 0.0
@@ -233,10 +274,11 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
             if step_count % 20 == 0 and torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            if is_main_process and (step_count % 15 == 0 or step_count == len(train_loader)):
+            if is_main_process and (step_count % 25 == 0 or step_count == len(train_loader)):
+                cur_lr = trainer.optimizer.param_groups[0]["lr"]
                 print(
                     f"  Epoch [{epoch}/{args.epochs}] | Step [{step_count}/{len(train_loader)}] | "
-                    f"RLCD Loss: {metrics['loss']:.4f}"
+                    f"LR: {cur_lr:.2e} | RLCD Loss: {metrics['loss']:.4f}"
                 )
 
         if is_main_process:

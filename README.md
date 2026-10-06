@@ -88,13 +88,10 @@ with ClassOneClient(base_url="http://localhost:8000") as client:
             "urgent": Noul(instructions="Is this an urgent security event?"),
             "action": Choice(
                 instructions="Action required:",
-                criteria={"unlock": "Send unlock link", "escalate": "Escalate to SecOps"}
+                criteria={"unlock": "Send unlock link", "escalate": "Escalate to SecOps"},
             ),
-            "severity": Score(
-                instructions="Assess severity:",
-                criteria=["low", "medium", "critical"]
-            ),
-        }
+            "severity": Score(instructions="Assess severity:", criteria=["low", "medium", "critical"]),
+        },
     )
 
     print("Urgent P(true):", response.nouls["urgent"].noul)

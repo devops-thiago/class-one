@@ -67,3 +67,44 @@ def test_expected_calibration_error():
     targets = torch.tensor([1, 1, 1, 0, 0, 0])
     ece = expected_calibration_error(probs, targets, n_bins=5)
     assert pytest.approx(ece, abs=0.2) == 0.1
+
+
+def test_rlcd_loss_soft_uniform_distribution():
+    """Verifies that RLCDLoss accepts 2D soft probability targets (e.g. uniform for ambiguous/OOD inputs)."""
+    loss_fn = RLCDLoss(brier_weight=0.5, log_weight=1.0)
+
+    # Soft uniform target for 4 choices: [0.25, 0.25, 0.25, 0.25]
+    probs = torch.tensor([[0.25, 0.25, 0.25, 0.25]])
+    uniform_targets = torch.tensor([[0.25, 0.25, 0.25, 0.25]])
+    loss_val = loss_fn.forward_multiclass(probs, uniform_targets)
+    assert loss_val.item() > 0.0
+
+    # Perfectly matching uniform target yields zero Brier score
+    brier_component = 0.5 * torch.sum((probs - uniform_targets) ** 2)
+    assert brier_component.item() == 0.0
+
+
+def test_rlcd_focal_loss_modulation():
+    """Verifies that focal_gamma > 0 down-weights loss on highly confident correct predictions."""
+    loss_standard = RLCDLoss(brier_weight=0.0, log_weight=1.0, margin_weight=0.0, focal_gamma=0.0)
+    loss_focal = RLCDLoss(brier_weight=0.0, log_weight=1.0, margin_weight=0.0, focal_gamma=2.0)
+
+    # 1. Easy sample (p=0.95, target=1)
+    p_easy = torch.tensor([0.95])
+    t_easy = torch.tensor([1.0])
+    l_std_easy = loss_standard.forward_binary(p_easy, t_easy)
+    l_foc_easy = loss_focal.forward_binary(p_easy, t_easy)
+
+    # Focal loss should significantly reduce the loss for easy sample (by (1 - 0.95)^2 = 0.0025)
+    assert l_foc_easy.item() < 0.01 * l_std_easy.item()
+
+    # 2. Hard sample (p=0.40, target=1)
+    p_hard = torch.tensor([0.40])
+    t_hard = torch.tensor([1.0])
+    l_std_hard = loss_standard.forward_binary(p_hard, t_hard)
+    l_foc_hard = loss_focal.forward_binary(p_hard, t_hard)
+
+    # Ratio of focal to standard loss is much higher for hard samples than easy samples
+    hard_ratio = l_foc_hard.item() / l_std_hard.item()
+    easy_ratio = l_foc_easy.item() / l_std_easy.item()
+    assert hard_ratio > 10.0 * easy_ratio
