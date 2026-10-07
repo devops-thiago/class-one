@@ -16,7 +16,7 @@ REPO_ID = "devops-thiago/classone-system-one-curriculum"
 DATASET_CARD_CONTENT = """---
 language:
   - en
-license: apache-2.0
+license: cc-by-nc-sa-4.0
 tags:
   - decision-models
   - system-1
@@ -158,6 +158,14 @@ This curriculum synthesizes, refines, and builds upon several foundational datas
 - **ToxicChat** — *Lin, Z. et al. (LMSYS Org & UC San Diego, 2023)*
   Real-world benchmark for toxic and adversarial user prompt detection.
   [Paper](https://arxiv.org/abs/2310.17389) | [Hugging Face](https://huggingface.co/datasets/lmsys/toxic-chat) | License: CC BY 4.0.
+
+---
+
+## Licensing & Upstream Compatibility
+
+- **Aggregated Dataset License:** This dataset bundle is distributed under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**. This license is required because several incorporated upstream datasets carry Non-Commercial (`CC BY-NC-4.0` / `CC BY-NC-3.0`) and ShareAlike (`CC BY-SA-4.0`) stipulations (such as BeaverTails, SciQ, and MultiNLI).
+- **Codebase License:** The ClassOne neural architecture, loss functions, training engine, server runtime, and SDKs are independently authored software released under the **Apache 2.0 License**.
+- **Commercial Adaptation:** Organizations seeking commercial deployment can easily filter this curriculum to include only the fully permissive subsets (ContractNLI [CC BY], CUAD [CC BY], Banking77 [CC BY], LexGLUE [Apache 2.0], ToxicChat [CC BY], XSTest [CC BY], and Agentic Injections [MIT]).
 
 ---
 
