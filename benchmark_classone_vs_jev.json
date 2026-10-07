@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-09-27T12:34:36Z",
+  "runs": 15,
+  "classone": {
+    "model": "devops-thiago/classone-gemma4-e2b",
+    "device": "NVIDIA GeForce RTX 5060 Ti",
+    "mean_ms": 52.49,
+    "p50_ms": 52.13,
+    "p90_ms": 53.27,
+    "p95_ms": 53.72,
+    "min_ms": 51.6,
+    "max_ms": 54.52,
+    "throughput_rps": 19.05
+  },
+  "typesafe_jev": {
+    "model": "jev-1.13.0",
+    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "mean_ms": 329.9,
+    "p50_ms": 324.0,
+    "p90_ms": 369.75,
+    "p95_ms": 378.47,
+    "min_ms": 294.82,
+    "max_ms": 384.37,
+    "throughput_rps": 3.03
+  },
+  "speedup_factor": 6.29
+}

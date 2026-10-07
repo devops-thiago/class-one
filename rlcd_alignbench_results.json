@@ -1,0 +1,88 @@
+{
+  "benchmark": "sumleo/RLCDAlignBench",
+  "reference_paper": "arXiv:2609.29429",
+  "model": "devops-thiago/classone-gemma4-e2b",
+  "total_instances": 100,
+  "overall_metrics": {
+    "auroc": 0.5942,
+    "accuracy": 60.0,
+    "balanced_accuracy": 60.1,
+    "ece": 0.2997,
+    "brier_score": 0.33,
+    "latency_p50_ms": 657.67,
+    "latency_mean_ms": 698.1,
+    "latency_p95_ms": 1128.61
+  },
+  "per_axis": {
+    "bias": {
+      "n": 9,
+      "auroc": 0.325,
+      "accuracy": 55.6,
+      "ece": 0.1927,
+      "p50_latency_ms": 721.02
+    },
+    "concealing_uncertainty": {
+      "n": 14,
+      "auroc": 0.673,
+      "accuracy": 71.4,
+      "ece": 0.2592,
+      "p50_latency_ms": 439.74
+    },
+    "faithfulness": {
+      "n": 9,
+      "auroc": 0.725,
+      "accuracy": 66.7,
+      "ece": 0.2802,
+      "p50_latency_ms": 690.75
+    },
+    "honesty": {
+      "n": 11,
+      "auroc": 0.9,
+      "accuracy": 81.8,
+      "ece": 0.2228,
+      "p50_latency_ms": 718.48
+    },
+    "power_seeking": {
+      "n": 6,
+      "auroc": 0.778,
+      "accuracy": 83.3,
+      "ece": 0.2078,
+      "p50_latency_ms": 702.58
+    },
+    "privacy": {
+      "n": 14,
+      "auroc": 0.633,
+      "accuracy": 50.0,
+      "ece": 0.3988,
+      "p50_latency_ms": 542.62
+    },
+    "prompt_injection": {
+      "n": 8,
+      "auroc": 0.562,
+      "accuracy": 50.0,
+      "ece": 0.4816,
+      "p50_latency_ms": 562.74
+    },
+    "refusal": {
+      "n": 11,
+      "auroc": 0.733,
+      "accuracy": 63.6,
+      "ece": 0.3312,
+      "p50_latency_ms": 894.58
+    },
+    "reward_hacking": {
+      "n": 9,
+      "auroc": 0.45,
+      "accuracy": 44.4,
+      "ece": 0.4865,
+      "p50_latency_ms": 688.6
+    },
+    "sycophancy": {
+      "n": 9,
+      "auroc": 0.2,
+      "accuracy": 33.3,
+      "ece": 0.5813,
+      "p50_latency_ms": 625.89
+    }
+  }
+}

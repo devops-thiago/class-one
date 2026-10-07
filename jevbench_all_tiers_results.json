@@ -1,0 +1,77 @@
+[
+  {
+    "tier": "Easy",
+    "tasks": 48,
+    "correct": 48,
+    "accuracy": 100.0,
+    "ece": 0.0,
+    "brier": 0.0,
+    "latency_p50_ms": 115.07,
+    "latency_mean_ms": 124.46,
+    "latency_p95_ms": 148.72,
+    "type_breakdown": {
+      "noul": {
+        "correct": 12,
+        "total": 12
+      },
+      "choice": {
+        "correct": 36,
+        "total": 36
+      },
+      "score": {
+        "correct": 0,
+        "total": 0
+      }
+    }
+  },
+  {
+    "tier": "Original",
+    "tasks": 72,
+    "correct": 70,
+    "accuracy": 97.22,
+    "ece": 0.0319,
+    "brier": 0.0285,
+    "latency_p50_ms": 114.73,
+    "latency_mean_ms": 113.45,
+    "latency_p95_ms": 149.14,
+    "type_breakdown": {
+      "noul": {
+        "correct": 22,
+        "total": 24
+      },
+      "choice": {
+        "correct": 36,
+        "total": 36
+      },
+      "score": {
+        "correct": 12,
+        "total": 12
+      }
+    }
+  },
+  {
+    "tier": "Hard",
+    "tasks": 111,
+    "correct": 67,
+    "accuracy": 60.36,
+    "ece": 0.2813,
+    "brier": 0.3101,
+    "latency_p50_ms": 323.13,
+    "latency_mean_ms": 643.86,
+    "latency_p95_ms": 1647.18,
+    "type_breakdown": {
+      "noul": {
+        "correct": 22,
+        "total": 38
+      },
+      "choice": {
+        "correct": 41,
+        "total": 67
+      },
+      "score": {
+        "correct": 4,
+        "total": 6
+      }
+    }
+  }
+]
