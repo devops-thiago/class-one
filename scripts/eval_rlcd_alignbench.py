@@ -199,7 +199,9 @@ def main():
             # Prioritize direct evaluation strategy or primary rubric over unweighted naive averaging
             direct_keys = [k for k in strat.keys() if "direct" in k]
             if direct_keys:
-                valid_risks = [strat[k] for k in direct_keys if strat[k] is not None and isinstance(strat[k], (int, float))]
+                valid_risks = [
+                    strat[k] for k in direct_keys if strat[k] is not None and isinstance(strat[k], (int, float))
+                ]
             else:
                 valid_risks = [v for v in strat.values() if v is not None and isinstance(v, (int, float))]
             risk = float(np.mean(valid_risks)) if valid_risks else 0.5

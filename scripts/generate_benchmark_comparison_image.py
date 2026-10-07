@@ -31,6 +31,7 @@ TIE_BADGE = "#0284C7"
 
 DIVIDER_COLOR = "#1E293B"
 
+
 def get_fonts():
     try:
         title_font = ImageFont.truetype("C:\\Windows\\Fonts\\segoeuib.ttf", 36)
@@ -64,8 +65,10 @@ def get_fonts():
         "card_sub": card_sub,
     }
 
+
 def draw_rounded_rect(draw, box, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+
 
 def draw_badge(draw, x, y, text, variant, font):
     if variant == "classone":
@@ -81,6 +84,7 @@ def draw_badge(draw, x, y, text, variant, font):
     draw_rounded_rect(draw, (x, y, x + w, y + h), radius=6, fill=bg)
     draw.text((x + 8, y + 3), text, font=font, fill=fg)
     return w
+
 
 def render_table(draw, x, y, width, headers, rows, col_widths, fonts):
     row_height = 42
@@ -106,12 +110,16 @@ def render_table(draw, x, y, width, headers, rows, col_widths, fonts):
 
         # ClassOne Value
         co_color = WIN_CLASSONE_TEXT if winner == "ClassOne" else TEXT_PRIMARY
-        draw.text((cx, cur_y + 10), co_val, font=fonts["body_bold"] if winner == "ClassOne" else fonts["body"], fill=co_color)
+        draw.text(
+            (cx, cur_y + 10), co_val, font=fonts["body_bold"] if winner == "ClassOne" else fonts["body"], fill=co_color
+        )
         cx += col_widths[1]
 
         # Jev Value
         jev_color = WIN_JEV_TEXT if winner == "Jev API" else TEXT_PRIMARY
-        draw.text((cx, cur_y + 10), jev_val, font=fonts["body_bold"] if winner == "Jev API" else fonts["body"], fill=jev_color)
+        draw.text(
+            (cx, cur_y + 10), jev_val, font=fonts["body_bold"] if winner == "Jev API" else fonts["body"], fill=jev_color
+        )
         cx += col_widths[2]
 
         # Winner Badge
@@ -123,6 +131,7 @@ def render_table(draw, x, y, width, headers, rows, col_widths, fonts):
 
     return cur_y
 
+
 def main():
     W, H = 1600, 1400
     img = Image.new("RGB", (W, H), color=BG_COLOR)
@@ -131,29 +140,67 @@ def main():
 
     # 1. Header Banner
     draw.text((60, 45), "ClassOne (Qwen 3.5 9B) vs. TypeSafe Jev API (v1.13)", font=fonts["title"], fill=TEXT_WHITE)
-    draw.text((60, 95), "Head-to-head empirical evaluation across JevBench (231 tasks) and RLCDAlignBench (100 instances)", font=fonts["subtitle"], fill=TEXT_SECONDARY)
+    draw.text(
+        (60, 95),
+        "Head-to-head empirical evaluation across JevBench (231 tasks) and RLCDAlignBench (100 instances)",
+        font=fonts["subtitle"],
+        fill=TEXT_SECONDARY,
+    )
 
     # 2. Metric Highlight Cards
     cards = [
-        {"title": "SPEED & LATENCY", "val": "2.82× Faster", "sub": "115.1 ms vs 324.0 ms p50", "lead": "ClassOne Wins", "var": "classone"},
-        {"title": "ORIGINAL TIER CHOICE", "val": "100.0% (36/36)", "sub": "Jev API: 97.2% (35/36)", "lead": "ClassOne Wins", "var": "classone"},
-        {"title": "JEVBENCH AGGREGATE", "val": "80.1% vs 86.6%", "sub": "185/231 vs 200/231 tasks", "lead": "Jev API Wins", "var": "jev"},
-        {"title": "INFERENCE COST", "val": "$0.00 / Local", "sub": "Jev API: $0.042 / MTok", "lead": "ClassOne Wins", "var": "classone"},
+        {
+            "title": "SPEED & LATENCY",
+            "val": "2.82× Faster",
+            "sub": "115.1 ms vs 324.0 ms p50",
+            "lead": "ClassOne Wins",
+            "var": "classone",
+        },
+        {
+            "title": "ORIGINAL TIER CHOICE",
+            "val": "100.0% (36/36)",
+            "sub": "Jev API: 97.2% (35/36)",
+            "lead": "ClassOne Wins",
+            "var": "classone",
+        },
+        {
+            "title": "JEVBENCH AGGREGATE",
+            "val": "80.1% vs 86.6%",
+            "sub": "185/231 vs 200/231 tasks",
+            "lead": "Jev API Wins",
+            "var": "jev",
+        },
+        {
+            "title": "INFERENCE COST",
+            "val": "$0.00 / Local",
+            "sub": "Jev API: $0.042 / MTok",
+            "lead": "ClassOne Wins",
+            "var": "classone",
+        },
     ]
     card_w = 345
     card_h = 125
     cx = 60
     cy = 145
     for c in cards:
-        draw_rounded_rect(draw, (cx, cy, cx + card_w, cy + card_h), radius=12, fill=SURFACE_COLOR, outline=SURFACE_BORDER, width=1)
+        draw_rounded_rect(
+            draw, (cx, cy, cx + card_w, cy + card_h), radius=12, fill=SURFACE_COLOR, outline=SURFACE_BORDER, width=1
+        )
         draw.text((cx + 18, cy + 14), c["title"], font=fonts["header"], fill=TEXT_MUTED)
-        draw.text((cx + 18, cy + 38), c["val"], font=fonts["card_big"], fill=WIN_CLASSONE_TEXT if c["var"]=="classone" else WIN_JEV_TEXT)
+        draw.text(
+            (cx + 18, cy + 38),
+            c["val"],
+            font=fonts["card_big"],
+            fill=WIN_CLASSONE_TEXT if c["var"] == "classone" else WIN_JEV_TEXT,
+        )
         draw.text((cx + 18, cy + 88), c["sub"], font=fonts["card_sub"], fill=TEXT_SECONDARY)
         cx += card_w + 30
 
     # 3. Table 1: JevBench Breakdown
     ty = 300
-    draw.text((60, ty), "1. JevBench Multi-Tier Reasoning & Capability (231 Public Tasks)", font=fonts["h2"], fill=TEXT_WHITE)
+    draw.text(
+        (60, ty), "1. JevBench Multi-Tier Reasoning & Capability (231 Public Tasks)", font=fonts["h2"], fill=TEXT_WHITE
+    )
     headers_1 = ["Evaluation Metric", "ClassOne Qwen 3.5 9B", "TypeSafe Jev API (v1.13)", "Advantage"]
     widths_1 = [520, 320, 320, 240]
     rows_1 = [
@@ -173,7 +220,12 @@ def main():
 
     # 4. Table 2: RLCDAlignBench AI Safety & Alignment
     t2_y = t1_end_y + 30
-    draw.text((60, t2_y), "2. RLCDAlignBench AI Alignment & Safety (100 Instances Across 10 Failure Modes)", font=fonts["h2"], fill=TEXT_WHITE)
+    draw.text(
+        (60, t2_y),
+        "2. RLCDAlignBench AI Alignment & Safety (100 Instances Across 10 Failure Modes)",
+        font=fonts["h2"],
+        fill=TEXT_WHITE,
+    )
     headers_2 = ["Alignment Axis / Failure Mode", "ClassOne Qwen 3.5 9B", "TypeSafe Jev API (v1.13)", "Advantage"]
     widths_2 = [520, 320, 320, 240]
     rows_2 = [
@@ -206,6 +258,7 @@ def main():
     os.makedirs(os.path.dirname(OUTPUT_IMAGE_PATH), exist_ok=True)
     img.save(OUTPUT_IMAGE_PATH, "PNG", quality=95)
     print(f"[✓] Benchmark comparison image generated at: {OUTPUT_IMAGE_PATH}")
+
 
 if __name__ == "__main__":
     main()

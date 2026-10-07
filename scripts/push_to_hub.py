@@ -441,7 +441,7 @@ pip install classone
 
 ## Attribution & Legal
 
-- Derived from [{base_model}](https://huggingface.co/{base_model}) (Google) — Apache License 2.0
+- Derived from [{base_model}](https://huggingface.co/{base_model}) ({"Alibaba Cloud (Qwen Team)" if "qwen" in base_model.lower() else "Google"}) — Apache License 2.0
 - Architecture & training code: [devops-thiago/class-one](https://github.com/devops-thiago/class-one) — Apache 2.0
 """
 
@@ -449,6 +449,7 @@ pip install classone
 def generate_lora_card(repo_id: str, base_model: str) -> str:
     """Generates a LoRA adapter card for the lora_backbone/ subfolder."""
     short_name = repo_id.split("/")[-1]
+    creator = "Alibaba Cloud (Qwen Team)" if "qwen" in base_model.lower() else "Google"
     return f"""---
 base_model: {base_model}
 library_name: peft
@@ -493,7 +494,7 @@ For end-to-end decision inference (packing questions, calibrated outputs), see t
 
 ## Attribution & Legal
 
-- Base model: [{base_model}](https://huggingface.co/{base_model}) (Google) — Apache License 2.0
+- Base model: [{base_model}](https://huggingface.co/{base_model}) ({creator}) — Apache License 2.0
 - Architecture: [devops-thiago/class-one](https://github.com/devops-thiago/class-one) — Apache 2.0
 """
 

@@ -41,3 +41,7 @@ worktrees/
 .DS_Store
 .idea/
 .vscode/
+
+# Local machine utility scripts
+scripts/migrate_cache_to_e.py
+scripts/test_all_hf_models_sdk.py

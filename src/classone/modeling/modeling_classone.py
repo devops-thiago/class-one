@@ -288,7 +288,9 @@ class ClassOneModel(PreTrainedModel):
                     backbone.audio_tower = None
                 if hasattr(backbone, "get_input_embeddings"):
                     backbone.get_input_embeddings().float()
-                if hasattr(backbone, "language_model") and hasattr(backbone.language_model, "per_layer_model_projection"):
+                if hasattr(backbone, "language_model") and hasattr(
+                    backbone.language_model, "per_layer_model_projection"
+                ):
                     backbone.language_model.per_layer_model_projection.float()
 
                 layers_container = None
