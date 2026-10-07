@@ -67,6 +67,10 @@ ClassOne models are aligned using **Strictly Proper Scoring Rules** rather than 
 
 ## Published Models on Hugging Face Hub
 
+> [!TIP]
+> Explore all published models and datasets in the official Hugging Face Collection:
+> **[ClassOne System 1 Decision Models Collection](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)**
+
 | Repository ID | Base Model | Context | Formats |
 | :--- | :--- | :--- | :--- |
 | [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 128k | BF16, 4-bit NF4, LoRA |
@@ -172,7 +176,8 @@ python scripts/test_all_hf_models_sdk.py
 - **Architecture Specification:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Empirical Learnings & Plateau Analysis:** [`docs/empirical_learnings_and_plateau_analysis.md`](docs/empirical_learnings_and_plateau_analysis.md)
 - **Docker CPU Benchmarks:** [`docs/docker_cpu_benchmarks.md`](docs/docker_cpu_benchmarks.md)
-- **Training Dataset Release:** [`devops-thiago/classone-system1-decision-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system1-decision-curriculum)
+- **Hugging Face Collection:** [`devops-thiago/classone-system-1-decision-models`](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)
+- **Training Dataset Release:** [`devops-thiago/classone-system-one-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)
 
 ---
 
