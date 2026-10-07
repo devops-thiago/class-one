@@ -1,0 +1,49 @@
+{
+  "hardware": "Docker (2 vCPUs, 8 GB RAM, CPU only, no GPU, no GGUF)",
+  "quantization": "INT8 Dynamic (PyTorch torch.ao)",
+  "concurrency": 5,
+  "total_wall_clock_sec": 0.7677,
+  "total_input_tokens": 1610,
+  "total_decisions": 15,
+  "mean_latency_sec": 0.757,
+  "median_latency_sec": 0.7546,
+  "aggregate_tokens_per_sec": 2097.15,
+  "aggregate_decisions_per_sec": 19.54,
+  "workers": [
+    {
+      "worker_id": 1,
+      "latency_sec": 0.749,
+      "tokens": 322,
+      "tokens_per_sec": 429.93,
+      "decisions": 3
+    },
+    {
+      "worker_id": 2,
+      "latency_sec": 0.762,
+      "tokens": 322,
+      "tokens_per_sec": 422.58,
+      "decisions": 3
+    },
+    {
+      "worker_id": 3,
+      "latency_sec": 0.766,
+      "tokens": 322,
+      "tokens_per_sec": 420.37,
+      "decisions": 3
+    },
+    {
+      "worker_id": 4,
+      "latency_sec": 0.7546,
+      "tokens": 322,
+      "tokens_per_sec": 426.72,
+      "decisions": 3
+    },
+    {
+      "worker_id": 5,
+      "latency_sec": 0.7537,
+      "tokens": 322,
+      "tokens_per_sec": 427.23,
+      "decisions": 3
+    }
+  ]
+}

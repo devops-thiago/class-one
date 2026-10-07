@@ -12,13 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install CPU-only PyTorch first to optimize image size and build latency
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
 # Copy build files and application source before package installation
 COPY pyproject.toml README.md /app/
 COPY src/ /app/src/
 
-# Install dependencies and Jev package
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+# Install dependencies and ClassOne package
+RUN pip install --no-cache-dir .
 
 # Create checkpoints directory and set ownership
 RUN mkdir -p /app/checkpoints && chown -R appuser:appgroup /app

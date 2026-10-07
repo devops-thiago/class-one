@@ -53,13 +53,26 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
 
                     quant = os.environ.get("CLASSONE_QUANTIZATION")
                     device = os.environ.get("CLASSONE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
-                    _tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    _model = ClassOneModel.from_backbone(
-                        model_name,
-                        tokenizer=_tokenizer,
-                        device=device,
-                        quantization=quant,
+
+                    q8_pt_path = os.environ.get("CLASSONE_Q8_MODEL_PATH")
+                    if not q8_pt_path and os.path.isfile(model_name) and model_name.endswith(".pt"):
+                        q8_pt_path = model_name
+
+                    tok_path = os.environ.get("CLASSONE_TOKENIZER_PATH") or (
+                        os.path.dirname(q8_pt_path) if q8_pt_path and not os.path.isdir(model_name) else model_name
                     )
+                    _tokenizer = AutoTokenizer.from_pretrained(tok_path)
+
+                    if q8_pt_path and os.path.exists(q8_pt_path) and device == "cpu":
+                        print(f"Loading pre-quantized Q8 INT8 model with mmap=True from {q8_pt_path}...")
+                        _model = torch.load(q8_pt_path, map_location="cpu", weights_only=False, mmap=True)
+                    else:
+                        _model = ClassOneModel.from_backbone(
+                            model_name,
+                            tokenizer=_tokenizer,
+                            device=device,
+                            quantization=quant,
+                        )
                     # Load trained decision heads if available
                     heads_path = os.environ.get("CLASSONE_HEADS_PATH")
                     if not heads_path and os.path.exists(os.path.join(model_name, "classone_heads.pt")):
@@ -76,6 +89,10 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                         _model.noul_head.load_state_dict(heads["noul_head"])
                         _model.choice_head.load_state_dict(heads["choice_head"])
                         _model.score_head.load_state_dict(heads["score_head"])
+                        if str(_model.device) == "cpu":
+                            _model.noul_head.to(dtype=torch.float32)
+                            _model.choice_head.to(dtype=torch.float32)
+                            _model.score_head.to(dtype=torch.float32)
 
                 _prompt_builder = ClassOnePromptBuilder(_tokenizer)
 
