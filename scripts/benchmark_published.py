@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
 
@@ -40,7 +41,12 @@ def parse_args():
     parser.add_argument("--dtype", type=str, default="float16", choices=["float16", "bfloat16", "float32"])
     parser.add_argument("--classone-gpu", type=int, default=0, help="GPU index for ClassOne")
     parser.add_argument("--ar-gpu", type=int, default=1, help="GPU index for AR baseline")
-    parser.add_argument("--output-json", type=str, default="benchmark_published_results.json")
+    parser.add_argument(
+        "--output-json",
+        type=str,
+        default="benchmarks/results/benchmark_published_results.json",
+        help="Path to output JSON metrics",
+    )
     return parser.parse_args()
 
 
@@ -286,6 +292,7 @@ def main():
     }
 
     if args.output_json:
+        os.makedirs(os.path.dirname(args.output_json) or ".", exist_ok=True)
         with open(args.output_json, "w") as f:
             json.dump(summary_data, f, indent=2)
         print(f"[✓] Detailed results exported to: {args.output_json}")

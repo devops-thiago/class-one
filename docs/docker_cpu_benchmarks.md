@@ -78,7 +78,7 @@ Concurrent load test executed with 5 parallel worker threads sending realistic s
 | **p95 Latency** | **1,006.3 ms** | Single-pass feedforward |
 | **Container RAM Usage** | **412.3 MiB** | **5.03%** of 8 GB ceiling |
 
-Raw JSON metrics are captured in [docker_cpu_benchmark_results.json](file:///c:/Users/Thiago%20Gonzaga/class-one/worktrees/docker-cpu-e2b-q8/docker_cpu_benchmark_results.json).
+Raw JSON metrics are captured in [docker_cpu_benchmark_results.json](file:///c:/Users/Thiago%20Gonzaga/class-one/benchmarks/results/docker_cpu_benchmark_results.json).
 
 ---
 

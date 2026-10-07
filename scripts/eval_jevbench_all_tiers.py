@@ -248,9 +248,11 @@ def main():
     )
     print("=" * 80 + "\n")
 
-    with open("jevbench_all_tiers_results.json", "w") as f:
+    out_path = os.path.join("benchmarks", "results", "jevbench_all_tiers_results.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(all_results, f, indent=2)
-    print("[✓] Full multi-tier results exported to: jevbench_all_tiers_results.json")
+    print(f"[✓] Full multi-tier results exported to: {out_path}")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ Measures:
 
 import gc
 import json
+import os
 import time
 
 import numpy as np
@@ -185,9 +186,11 @@ def main():
     print(f"{'Min GPU Required':<{col1}} │ {'12 GB GPU':>{col2}} │ {'8 GB GPU':>{col3}} │ {'6–8 GB GPU':>{col4}}")
     print("=" * 76 + "\n")
 
-    with open("benchmark_quantization_results.json", "w") as f:
+    out_path = os.path.join("benchmarks", "results", "benchmark_quantization_results.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
-    print("[✓] Detailed benchmark exported to: benchmark_quantization_results.json")
+    print(f"[✓] Detailed benchmark exported to: {out_path}")
 
 
 if __name__ == "__main__":

@@ -403,9 +403,11 @@ def main():
         "speedup_factor": round(speedup, 2),
     }
 
-    with open("benchmark_classone_vs_jev.json", "w") as f:
+    out_path = os.path.join("benchmarks", "results", "benchmark_classone_vs_jev.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(results_out, f, indent=2)
-    print("[✓] Full benchmark data exported to: benchmark_classone_vs_jev.json")
+    print(f"[✓] Full benchmark data exported to: {out_path}")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import statistics
 import time
 from typing import Any
@@ -175,9 +176,11 @@ async def main():
             for r in results
         ],
     }
-    with open("docker_cpu_benchmark_results.json", "w") as f:
+    out_path = os.path.join("benchmarks", "results", "docker_cpu_benchmark_results.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(metrics, f, indent=2)
-    print("Saved results to docker_cpu_benchmark_results.json")
+    print(f"Saved results to {out_path}")
 
 
 if __name__ == "__main__":

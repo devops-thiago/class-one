@@ -320,9 +320,11 @@ def main():
         "per_axis": per_axis_summary,
     }
 
-    with open("rlcd_alignbench_results.json", "w") as f:
+    out_path = os.path.join("benchmarks", "results", "rlcd_alignbench_results.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
         json.dump(summary_export, f, indent=2)
-    print("[✓] Full evaluation metrics exported to: rlcd_alignbench_results.json")
+    print(f"[✓] Full evaluation metrics exported to: {out_path}")
 
 
 if __name__ == "__main__":
