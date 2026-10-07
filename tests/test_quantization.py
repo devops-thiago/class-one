@@ -67,3 +67,5 @@ def test_quantized_model_inference_cuda(quant_mode):
     assert "urgency" in answers
     assert answers["urgency"].type == "score"
     assert 1.0 <= answers["urgency"].score <= 3.0
+
+    del model

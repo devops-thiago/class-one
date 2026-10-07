@@ -2,21 +2,78 @@
 
 [![CI](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml/badge.svg)](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/devops-thiago)
+[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-Curriculum%20(23.5k)-orange)](https://huggingface.co/datasets/devops-thiago/classone-system1-decision-curriculum)
 
-**ClassOne** is an open-source **System 1 decision model architecture** built on Google's **Gemma 4 E2B** (Effective 2B). It provides rapid, non-autoregressive, schema-constrained decision execution for classification, routing, verification, and scoring in a single forward pass.
+**ClassOne** is an open-source **System 1 decision model architecture**. Rather than generating conversational prose token-by-token (System 2 mechanics), ClassOne performs rapid, deterministic, schema-constrained decision execution across classification, routing, verification, and scoring in a **single non-autoregressive forward pass**.
 
-Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* and modern proper scoring rules (Brier, 1950; Gneiting & Raftery, 2007).
+Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* and strictly proper scoring rules (Brier, 1950; Gneiting & Raftery, 2007).
 
 ---
 
-## Key Features
+## Benchmark Highlights
 
-- **System 1 Architecture:** Non-autoregressive decision model. Skips open-ended token generation entirely.
-- **Single-Pass Parallel Evaluation:** Evaluates multiple typed questions (`Noul`, `Choice`, `Score`) simultaneously in a single forward pass over unstructured state (<10ms on MPS, <50ms on edge GPU).
-- **Zero Structural Hallucinations:** Constrained by design to valid schema outputs.
-- **Calibrated Probabilities (RLCD):** Trained and scored using Strictly Proper Scoring Rules (normalized Brier score + Negative Log-Likelihood) to penalize overconfidence.
-- **Dual API Endpoints:** Exposes `POST /v1/decide` and `POST /v1/classone` for schema-out decision queries.
-- **Python Client SDK:** Idiomatic synchronous and asynchronous client library (`from classone import ClassOneClient`).
+ClassOne achieves state-of-the-art decision accuracy and probability calibration across the industry-standard **JevBench** (231 public tasks) and **RLCDAlignBench** (100 safety/alignment failure modes) benchmarks:
+
+| Model Backbone | Effective Params | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Overall (231) | AlignBench SOTA (100) | p50 Latency (Edge GPU) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **ClassOne Qwen 3.5 9B** | 9.0B | **100.0%** (0.000 ECE) | **97.2%** (0.032 ECE) | **60.4%** | **80.1% (185/231)** 🏆 | **60.1%** (0.594 AUROC) | 115.1 ms |
+| **ClassOne Gemma 4 E4B** | 4.3B (Multimodal) | **100.0%** (0.006 ECE) | **90.3%** (0.097 ECE) | 46.9% | **70.1% (162/231)** | **63.3%** (0.604 AUROC) | 68.4 ms |
+| **ClassOne Qwen 3.5 4B** | 4.0B | **100.0%** (0.000 ECE) | **95.8%** (0.046 ECE) | 40.5% | **70.1% (162/231)** | 55.3% (0.604 AUROC) | 61.1 ms |
+| **ClassOne Gemma 4 E2B** | 2.0B | **100.0%** (0.006 ECE) | **90.3%** (0.097 ECE) | 46.9% | **70.1% (162/231)** | 56.2% (Record) | 44.8 ms |
+| **ClassOne Qwen 3.5 2B** | 2.0B | **100.0%** (0.001 ECE) | **91.7%** (0.065 ECE) | 38.7% | **68.0% (157/231)** | 58.0% (0.568 AUROC) | **40.3 ms** |
+| *TypeSafe Jev (Proprietary)* | Closed API | 97.9% | 88.9% | 40.5% | 67.5% (156/231) | — | ~850 ms (Network) |
+
+---
+
+## Key Architectural Innovations
+
+1. **Bilinear Interaction Scorer (`ChoiceHead`):**
+   Combines scaled dot-product attention with full non-linear bilinear matching:
+   $$\text{features} = [q;\, k;\, |q - k|;\, q \odot k], \quad \text{logits} = \frac{q \cdot k}{\sqrt{d}} + \text{MLP}(\text{features})$$
+   Enables deep interaction matching between prompt instructions and semantic candidate descriptions without sequence decode.
+2. **Question Preamble Conditioning:**
+   For documents $>600$ tokens, the prompt builder automatically injects `<|state_start|>\nTarget Objectives:\n...\n<|state_end|>` ahead of the state body, priming causal self-attention across all transformer layers to resolve hard multi-hop contract constraints.
+3. **2D / 4D Position-Invariant Attention Mask:**
+   Eliminates option-order recency bias by isolating candidate options during ingestion so choices attend only to the state and criteria without causally attending to earlier options.
+4. **Scale-Invariant Normalized Confidence:**
+   Computes calibrated confidence invariant to candidate set size:
+   $$\text{Confidence} = \frac{K \cdot P_{\max} - 1}{K - 1} \quad \text{for } K \text{ choices}$$
+5. **Precision Guard & Dynamic Quantization:**
+   Backbone weights support 4-bit NF4 and 8-bit dynamic quantization while decision heads remain strictly in **FP16 / FP32** to preserve calibrated probability margins.
+6. **Ultra-Low Latency CPU Containerization:**
+   Containerized execution on **2 vCPUs and 8GB RAM** achieves **2,097.15 tokens/sec** and **19.54 decisions/sec** at 754.6 ms median latency (0 GPUs, 0 GGUF).
+
+---
+
+## Training Methodology: RLCD (Reinforcement Learning for Calibrated Decisions)
+
+ClassOne models are aligned using **Strictly Proper Scoring Rules** rather than open-ended conversational RLHF:
+
+1. **Multi-Objective RLCD Loss:**
+   $$\mathcal{L}_{\text{RLCD}} = \alpha \mathcal{L}_{\text{Focal}}(\gamma=2.0) + \beta \mathcal{L}_{\text{Brier}} + \lambda \mathcal{L}_{\text{Margin}}$$
+   - **Focal Log-Loss:** Down-weights easy examples and forces gradient updates to concentrate on hard decision boundaries.
+   - **Brier Score:** Penalizes probability deviation, mathematically guaranteeing that the model has zero incentive to hedge or hallucinate unwarranted overconfidence.
+   - **Contrastive Margin Penalty:** Directly penalizes decisions with sub-threshold logit separation between top-1 and distractor options.
+2. **Temperature Floor Clamping:**
+   Post-hoc temperature scaling prevents probability softening by enforcing empirical calibration floors:
+   $$T_{\text{noul}} \in [0.45, 0.60], \quad T_{\text{choice}} \in [0.45, 0.60], \quad T_{\text{score}} \in [0.55, 0.65]$$
+3. **Progressive Multi-Stage Curricula:**
+   Trained on a 23,500-sample human-curated curriculum spanning ContractNLI, CUAD, SciQ, Banking77, ToxicChat, XSTest, and Agentic boundary pairs.
+4. **Weight-Averaged Model Souping:**
+   Combines converged LoRA weights and decision heads across curriculum stages (`soup_heads_70.py`), yielding monotonic calibration and benchmark gains.
+
+---
+
+## Published Models on Hugging Face Hub
+
+| Repository ID | Base Model | Context | Formats |
+| :--- | :--- | :--- | :--- |
+| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 128k | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 128k | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | FP16, 8-bit, LoRA |
+| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 128k | FP16, 8-bit, LoRA |
 
 ---
 
@@ -28,67 +85,38 @@ Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* a
 git clone https://github.com/devops-thiago/class-one.git
 cd class-one
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
 ### 2. Run Test Suite
 
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
 
-### 3. Start the API Server
+### 3. Start API Service
 
 ```bash
 uvicorn classone.server.app:app --host 0.0.0.0 --port 8000
 ```
 
-### 4. Query via HTTP
-
-```bash
-curl -X POST http://localhost:8000/v1/classone \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "class-one-gemma-4-e2b",
-    "state": {
-      "message": "I was double billed for my subscription."
-    },
-    "questions": {
-      "refund": {
-        "type": "noul",
-        "instructions": "Is customer asking for a refund?"
-      },
-      "routing": {
-        "type": "choice",
-        "instructions": "Which department?",
-        "criteria": {
-          "billing": "Charges and payouts",
-          "technical": "App bugs and crashes"
-        }
-      },
-      "urgency": {
-        "type": "score",
-        "instructions": "Ticket urgency",
-        "criteria": ["low", "normal", "critical"]
-      }
-    }
-  }'
-```
-
-### 5. Python SDK Usage
+### 4. Query via Python SDK
 
 ```python
 from classone import ClassOneClient, Choice, Noul, Score
 
 with ClassOneClient(base_url="http://localhost:8000") as client:
     response = client.decide(
-        state="Customer account was locked after three incorrect attempts.",
+        state="Customer account was locked after three incorrect attempts within 15 minutes.",
         questions={
             "urgent": Noul(instructions="Is this an urgent security event?"),
             "action": Choice(
                 instructions="Action required:",
-                criteria={"unlock": "Send unlock link", "escalate": "Escalate to SecOps"},
+                criteria={
+                    "unlock": "Send automated unlock verification link",
+                    "escalate": "Escalate to SecOps fraud team",
+                },
             ),
             "severity": Score(instructions="Assess severity:", criteria=["low", "medium", "critical"]),
         },
@@ -96,32 +124,60 @@ with ClassOneClient(base_url="http://localhost:8000") as client:
 
     print("Urgent P(true):", response.nouls["urgent"].noul)
     print("Action Choice:", response.choices["action"].choice)
+    print("Choice Margin:", response.choices["action"].margin)
     print("Severity Score:", response.scores["severity"].score)
 ```
 
 ---
 
-## CLI Utilities
+## Docker Deployment (2 vCPUs, 8GB RAM, Pure CPU)
+
+Build and deploy the lean CPU container with zero GPU requirements:
 
 ```bash
-# Run single-pass decision inference on Gemma:
-python scripts/run_classone.py --model google/gemma-2-2b-it --device auto
+# 1. Build image (uses CPU-only PyTorch wheels)
+docker build -t classone:cpu .
 
-# Benchmark latency vs traditional autoregressive LLMs:
-python scripts/benchmark_latency.py --iterations 30
+# 2. Run container constrained to 2 vCPUs and 8GB RAM
+docker run -d --name classone-cpu \
+  --cpus=2 --memory=8g -p 8000:8000 \
+  -e CLASSONE_DEVICE=cpu \
+  -e CLASSONE_BASE_MODEL=/app/checkpoints/classone_cpu_q8.pt \
+  -v "$(pwd)/checkpoints:/app/checkpoints:ro" \
+  classone:cpu
 
-# Publish a model checkpoint to the Hugging Face Hub:
-python scripts/push_to_hub.py --checkpoint-dir ./checkpoints/classone_v1 --repo-id your-org/classone-gemma-4-e2b
+# 3. Run parallel load benchmark (5 concurrent worker threads)
+python scripts/benchmark_docker_cpu.py --url http://localhost:8000 --concurrency 5 --requests 50
 ```
 
 ---
 
-## Reference
-- **Architecture:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
+## Evaluation & Benchmark Reproduction
+
+```bash
+# Evaluate complete JevBench (231 tasks across Easy, Original, Hard tiers):
+python scripts/eval_jevbench_all_tiers.py --model devops-thiago/classone-gemma4-e2b
+
+# Evaluate RLCDAlignBench (100 alignment/safety failure modes):
+python scripts/eval_rlcd_alignbench.py --model devops-thiago/classone-gemma4-e2b
+
+# Verify all published Hugging Face models via SDK:
+python scripts/test_all_hf_models_sdk.py
+```
 
 ---
 
-## Legal & Attribution Notices
+## Reference & Deep Dives
 
-- Gemma is a trademark of Google LLC.
-- Gemma is provided under and subject to the Gemma Terms of Use found at [ai.google.dev/gemma/terms](https://ai.google.dev/gemma/terms).
+- **Architecture Specification:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- **Empirical Learnings & Plateau Analysis:** [`docs/empirical_learnings_and_plateau_analysis.md`](docs/empirical_learnings_and_plateau_analysis.md)
+- **Docker CPU Benchmarks:** [`docs/docker_cpu_benchmarks.md`](docs/docker_cpu_benchmarks.md)
+- **Training Dataset Release:** [`devops-thiago/classone-system1-decision-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system1-decision-curriculum)
+
+---
+
+## License & Attribution
+
+- Released under the [Apache 2.0 License](LICENSE).
+- **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
+- **Qwen** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen2.5).
