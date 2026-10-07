@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-09-27T11:57:03Z",
+  "published_model": "devops-thiago/classone-gemma4-e2b",
+  "base_model": "google/gemma-4-e2b-it",
+  "precision": "float16",
+  "iterations": 30,
+  "warmup": 5,
+  "hardware": {
+    "gpus": [
+      {
+        "id": 0,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "vram_gb": 15.93
+      },
+      {
+        "id": 1,
+        "name": "NVIDIA GeForce RTX 5060 Ti",
+        "vram_gb": 15.93
+      }
+    ],
+    "classone_device": "cuda:0",
+    "ar_device": "cuda:1"
+  },
+  "classone_metrics": {
+    "mean_ms": 47.07,
+    "p50_ms": 46.96,
+    "p90_ms": 48.24,
+    "p95_ms": 48.79,
+    "p99_ms": 49.23,
+    "min_ms": 45.6,
+    "max_ms": 49.32,
+    "throughput_rps": 21.24,
+    "vram_allocated_gb": 9.54,
+    "vram_peak_gb": 9.54
+  },
+  "ar_baseline_metrics": {
+    "mean_ms": 1048.57,
+    "p50_ms": 1047.23,
+    "p90_ms": 1055.92,
+    "p95_ms": 1062.45,
+    "p99_ms": 1067.8,
+    "min_ms": 1042.04,
+    "max_ms": 1068.1,
+    "throughput_rps": 0.95,
+    "vram_allocated_gb": 9.51,
+    "vram_peak_gb": 9.51
+  },
+  "speedup_factor": 22.28
+}

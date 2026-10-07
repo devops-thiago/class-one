@@ -1,0 +1,3 @@
+FROM ./worktrees/qwen-3.5-2b/checkpoints/classone_qwen2b_champion_merged
+PARAMETER temperature 0.50
+PARAMETER num_ctx 8192

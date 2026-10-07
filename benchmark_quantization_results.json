@@ -1,0 +1,56 @@
+[
+  {
+    "mode": "FP16 (Baseline)",
+    "load_time_s": 7.26,
+    "vram_alloc_gb": 9.54,
+    "vram_peak_gb": 9.54,
+    "mean_ms": 48.58,
+    "p50_ms": 48.65,
+    "p95_ms": 49.4,
+    "min_ms": 46.98,
+    "max_ms": 49.96,
+    "rps": 20.6,
+    "sample_output": {
+      "refund": 0.998,
+      "routing": "tech",
+      "routing_conf": 0.6243,
+      "urgency": 2.5859
+    }
+  },
+  {
+    "mode": "8-bit (INT8)",
+    "load_time_s": 8.31,
+    "vram_alloc_gb": 7.39,
+    "vram_peak_gb": 7.39,
+    "mean_ms": 154.3,
+    "p50_ms": 151.07,
+    "p95_ms": 165.75,
+    "min_ms": 149.21,
+    "max_ms": 168.53,
+    "rps": 6.5,
+    "sample_output": {
+      "refund": 0.9985,
+      "routing": "tech",
+      "routing_conf": 0.2365,
+      "urgency": 2.4004
+    }
+  },
+  {
+    "mode": "4-bit (NF4)",
+    "load_time_s": 7.28,
+    "vram_alloc_gb": 6.33,
+    "vram_peak_gb": 6.33,
+    "mean_ms": 71.98,
+    "p50_ms": 70.62,
+    "p95_ms": 82.09,
+    "min_ms": 67.67,
+    "max_ms": 82.82,
+    "rps": 13.9,
+    "sample_output": {
+      "refund": 0.9438,
+      "routing": "general",
+      "routing_conf": 0.2419,
+      "urgency": 3.0254
+    }
+  }
+]
