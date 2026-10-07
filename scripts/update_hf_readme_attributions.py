@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-import os
 import sys
 
 sys.path.insert(0, ".")
 sys.path.insert(0, "scripts")
 
 from huggingface_hub import HfApi
-from push_to_hub import generate_model_card, generate_lora_card
+from push_to_hub import generate_lora_card, generate_model_card
 
 api = HfApi()
 

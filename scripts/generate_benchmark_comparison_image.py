@@ -3,6 +3,7 @@
 ClassOne Qwen 3.5 9B vs TypeSafe Jev API on JevBench and RLCDAlignBench."""
 
 import os
+
 from PIL import Image, ImageDraw, ImageFont
 
 OUTPUT_IMAGE_PATH = "docs/benchmark_comparison_classone_vs_jev.png"

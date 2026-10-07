@@ -20,7 +20,6 @@ import time
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 import torch
-import torch.distributed as dist
 import torch.multiprocessing as mp
 from transformers import AutoTokenizer
 
