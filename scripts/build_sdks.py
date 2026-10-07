@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generates production-ready SDKs for Node.js, Go, Rust, Java, and Ruby in classone-sdks."""
 
+import os
 from pathlib import Path
 
-TARGET_DIR = Path(r"C:\Users\Thiago Gonzaga\classone-sdks")
+TARGET_DIR = Path(os.environ.get("CLASSONE_SDKS_DIR", Path(__file__).resolve().parent.parent / "classone-sdks"))
 
 
 def write_file(rel_path: str, content: str):

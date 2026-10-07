@@ -18,7 +18,7 @@ This document details the containerized CPU execution of ClassOne Gemma-4 E2B us
 
 ## 2. Dockerfile Configuration
 
-The production [Dockerfile](file:///c:/Users/Thiago%20Gonzaga/class-one/worktrees/docker-cpu-e2b-q8/Dockerfile) builds a lean, secure image:
+The production [Dockerfile](../Dockerfile) builds a lean, secure image:
 
 ```dockerfile
 FROM python:3.11-slim
@@ -78,7 +78,7 @@ Concurrent load test executed with 5 parallel worker threads sending realistic s
 | **p95 Latency** | **1,006.3 ms** | Single-pass feedforward |
 | **Container RAM Usage** | **412.3 MiB** | **5.03%** of 8 GB ceiling |
 
-Raw JSON metrics are captured in [docker_cpu_benchmark_results.json](file:///c:/Users/Thiago%20Gonzaga/class-one/benchmarks/results/docker_cpu_benchmark_results.json).
+Raw JSON metrics are captured in [docker_cpu_benchmark_results.json](../benchmarks/results/docker_cpu_benchmark_results.json).
 
 ---
 
@@ -95,7 +95,7 @@ docker run -d --name classone-cpu-e2b-q8 \
   --cpus=2 --memory=8g -p 8000:8000 \
   -e CLASSONE_DEVICE=cpu \
   -e CLASSONE_BASE_MODEL=/app/checkpoints/classone_cpu_q8.pt \
-  -v "C:/Users/Thiago Gonzaga/class-one/checkpoints:/app/checkpoints:ro" \
+  -v "$(pwd)/checkpoints:/app/checkpoints:ro" \
   classone:cpu
 ```
 
