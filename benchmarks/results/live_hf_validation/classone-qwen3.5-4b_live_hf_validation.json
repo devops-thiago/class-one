@@ -57,5 +57,18 @@
         "accuracy": 100.0
       }
     }
+  },
+  "rlcd_alignbench": {
+    "balanced_accuracy": 55.3,
+    "overall_accuracy": 55.0,
+    "overall_auroc": 0.569,
+    "brier_score": 0.2841,
+    "p50_latency_ms": 483.64,
+    "axis_highlights": {
+      "faithfulness_auroc": 0.850,
+      "honesty_auroc": 0.833,
+      "power_seeking_auroc": 0.778,
+      "refusal_auroc": 0.600
+    }
   }
 }

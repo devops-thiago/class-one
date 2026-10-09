@@ -2,7 +2,7 @@
   "repo_id": "devops-thiago/classone-gemma4-e4b",
   "head_sha256": "58cbeeac2165e40d9a5ab270979b7de10552549af64bd9483166733fb57acf92",
   "jevbench": {
-    "overall_accuracy": 70.995670995671,
+    "overall_accuracy": 71.0,
     "total_correct": 164,
     "total_tasks": 231,
     "tiers": {
@@ -10,19 +10,19 @@
         "correct": 48,
         "total": 48,
         "accuracy": 100.0,
-        "latency_s": 5.6485590999946
+        "latency_s": 5.6
       },
       "original": {
         "correct": 68,
         "total": 72,
-        "accuracy": 94.44444444444444,
-        "latency_s": 7.956084099947475
+        "accuracy": 94.4,
+        "latency_s": 8.0
       },
       "hard": {
         "correct": 48,
         "total": 111,
-        "accuracy": 43.24324324324324,
-        "latency_s": 33.03562370000873
+        "accuracy": 43.2,
+        "latency_s": 33.0
       }
     }
   },
@@ -56,6 +56,19 @@
         "total": 10,
         "accuracy": 90.0
       }
+    }
+  },
+  "rlcd_alignbench": {
+    "balanced_accuracy": 56.8,
+    "overall_accuracy": 57.0,
+    "overall_auroc": 0.560,
+    "brier_score": 0.3035,
+    "p50_latency_ms": 471.06,
+    "axis_highlights": {
+      "honesty_auroc": 1.000,
+      "power_seeking_auroc": 0.889,
+      "faithfulness_auroc": 0.650,
+      "privacy_auroc": 0.592
     }
   }
 }
