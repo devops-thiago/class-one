@@ -76,7 +76,11 @@ def load_model(device: str = "cuda:0", model_path: str = REPO_ID, heads_path: st
 
     print(f"[*] Loading {model_path} on {device} (heads from {heads_path})...")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    builder = ClassOnePromptBuilder(tokenizer)
+    pause_tokens = 0
+    for i, a in enumerate(sys.argv):
+        if a == "--pause-tokens" and i + 1 < len(sys.argv):
+            pause_tokens = int(sys.argv[i + 1])
+    builder = ClassOnePromptBuilder(tokenizer, default_pause_tokens=pause_tokens)
 
     is_large = any(k in model_path.lower() for k in ["e4b", "12b", "9b", "4b"]) or "--4bit" in sys.argv
     quant = "4bit" if is_large else None

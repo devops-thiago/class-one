@@ -4,85 +4,85 @@
   "model": "devops-thiago/classone-gemma4-e2b",
   "total_instances": 100,
   "overall_metrics": {
-    "auroc": 0.5942,
-    "accuracy": 60.0,
-    "balanced_accuracy": 60.1,
-    "ece": 0.2997,
-    "brier_score": 0.33,
-    "latency_p50_ms": 657.67,
-    "latency_mean_ms": 698.1,
-    "latency_p95_ms": 1128.61
+    "auroc": 0.6293,
+    "accuracy": 63.0,
+    "balanced_accuracy": 62.93,
+    "ece": 0.2252,
+    "brier_score": 0.2959,
+    "latency_p50_ms": 681.99,
+    "latency_mean_ms": 721.42,
+    "latency_p95_ms": 1154.25
   },
   "per_axis": {
     "bias": {
       "n": 9,
-      "auroc": 0.325,
+      "auroc": 0.575,
       "accuracy": 55.6,
-      "ece": 0.1927,
-      "p50_latency_ms": 721.02
+      "ece": 0.096,
+      "p50_latency_ms": 730.05
     },
     "concealing_uncertainty": {
       "n": 14,
-      "auroc": 0.673,
-      "accuracy": 71.4,
-      "ece": 0.2592,
-      "p50_latency_ms": 439.74
+      "auroc": 0.755,
+      "accuracy": 85.7,
+      "ece": 0.3511,
+      "p50_latency_ms": 448.75
     },
     "faithfulness": {
       "n": 9,
-      "auroc": 0.725,
+      "auroc": 0.75,
       "accuracy": 66.7,
-      "ece": 0.2802,
-      "p50_latency_ms": 690.75
+      "ece": 0.1549,
+      "p50_latency_ms": 764.04
     },
     "honesty": {
       "n": 11,
       "auroc": 0.9,
       "accuracy": 81.8,
-      "ece": 0.2228,
-      "p50_latency_ms": 718.48
+      "ece": 0.1862,
+      "p50_latency_ms": 733.22
     },
     "power_seeking": {
       "n": 6,
-      "auroc": 0.778,
+      "auroc": 0.889,
       "accuracy": 83.3,
-      "ece": 0.2078,
-      "p50_latency_ms": 702.58
+      "ece": 0.189,
+      "p50_latency_ms": 717.09
     },
     "privacy": {
       "n": 14,
-      "auroc": 0.633,
+      "auroc": 0.612,
       "accuracy": 50.0,
-      "ece": 0.3988,
-      "p50_latency_ms": 542.62
+      "ece": 0.3799,
+      "p50_latency_ms": 568.6
     },
     "prompt_injection": {
       "n": 8,
       "auroc": 0.562,
       "accuracy": 50.0,
-      "ece": 0.4816,
-      "p50_latency_ms": 562.74
+      "ece": 0.395,
+      "p50_latency_ms": 583.94
     },
     "refusal": {
       "n": 11,
-      "auroc": 0.733,
-      "accuracy": 63.6,
-      "ece": 0.3312,
-      "p50_latency_ms": 894.58
+      "auroc": 0.8,
+      "accuracy": 72.7,
+      "ece": 0.1569,
+      "p50_latency_ms": 957.63
     },
     "reward_hacking": {
       "n": 9,
       "auroc": 0.45,
       "accuracy": 44.4,
-      "ece": 0.4865,
-      "p50_latency_ms": 688.6
+      "ece": 0.4958,
+      "p50_latency_ms": 702.65
     },
     "sycophancy": {
       "n": 9,
-      "auroc": 0.2,
+      "auroc": 0.35,
       "accuracy": 33.3,
-      "ece": 0.5813,
-      "p50_latency_ms": 625.89
+      "ece": 0.4248,
+      "p50_latency_ms": 661.66
     }
   }
 }
