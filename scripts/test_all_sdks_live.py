@@ -369,17 +369,30 @@ public class BenchRunner {{
     }}
 }}
 """
+    lib_dir = java_dir / "lib"
+    lib_dir.mkdir(exist_ok=True)
+    m2_repo = Path.home() / ".m2" / "repository" / "com" / "fasterxml" / "jackson" / "core"
+    for jar_name in ["jackson-databind-2.15.4.jar", "jackson-core-2.15.4.jar", "jackson-annotations-2.15.4.jar"]:
+        dst = lib_dir / jar_name
+        if not dst.exists() and m2_repo.exists():
+            found = list(m2_repo.rglob(jar_name))
+            if found:
+                dst.write_bytes(found[0].read_bytes())
+
+    sep = ";" if os.name == "nt" else ":"
+    cp = f"{bin_dir}{sep}{lib_dir}/*"
+
     bench_file = java_dir / "BenchRunner.java"
     bench_file.write_text(bench_code, encoding="utf-8")
     try:
         java_files = list((java_dir / "src" / "main" / "java" / "io" / "classone").glob("*.java"))
         subprocess.check_call(
-            ["javac", "-d", str(bin_dir)] + [str(f) for f in java_files] + [str(bench_file)],
+            ["javac", "-cp", cp, "-d", str(bin_dir)] + [str(f) for f in java_files] + [str(bench_file)],
             cwd=java_dir,
         )
 
         t0 = time.perf_counter()
-        out = subprocess.check_output(["java", "-cp", str(bin_dir), "BenchRunner"], cwd=java_dir, text=True)
+        out = subprocess.check_output(["java", "-cp", cp, "BenchRunner"], cwd=java_dir, text=True)
         wall_latency = (time.perf_counter() - t0) * 1000.0
         data = json.loads(out.strip())
         return {

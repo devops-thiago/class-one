@@ -166,13 +166,26 @@ def test_and_package_java(sdks_dir: Path) -> dict:
 
     java_sources = list((java_dir / "src" / "main" / "java" / "io" / "classone").glob("*.java"))
 
+    lib_dir = java_dir / "lib"
+    lib_dir.mkdir(exist_ok=True)
+    m2_repo = Path.home() / ".m2" / "repository" / "com" / "fasterxml" / "jackson" / "core"
+    for jar_name in ["jackson-databind-2.15.4.jar", "jackson-core-2.15.4.jar", "jackson-annotations-2.15.4.jar"]:
+        dst = lib_dir / jar_name
+        if not dst.exists() and m2_repo.exists():
+            found = list(m2_repo.rglob(jar_name))
+            if found:
+                dst.write_bytes(found[0].read_bytes())
+
+    sep = ";" if os.name == "nt" else ":"
+    cp = f"{bin_dir}{sep}{lib_dir}/*"
+
     # 1. Compile
-    run_cmd(["javac", "-d", str(bin_dir)] + [str(s) for s in java_sources], cwd=java_dir)
+    run_cmd(["javac", "-cp", cp, "-d", str(bin_dir)] + [str(s) for s in java_sources], cwd=java_dir)
 
     # 2. Javadoc
     javadoc_dir = target_dir / "javadoc"
     run_cmd(
-        ["javadoc", "-quiet", "-d", str(javadoc_dir)] + [str(s) for s in java_sources],
+        ["javadoc", "-quiet", "-cp", cp, "-d", str(javadoc_dir)] + [str(s) for s in java_sources],
         cwd=java_dir,
     )
 
