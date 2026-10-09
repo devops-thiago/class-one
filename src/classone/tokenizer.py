@@ -62,16 +62,19 @@ class ClassOnePromptBuilder:
     def __init__(self, tokenizer: PreTrainedTokenizerBase, default_pause_tokens: int = 0):
         self.tokenizer = tokenizer
         self.default_pause_tokens = default_pause_tokens
-        has_existing_custom = (
-            hasattr(tokenizer, "convert_tokens_to_ids")
-            and tokenizer.convert_tokens_to_ids("<|state_start|>") is not None
-            and tokenizer.convert_tokens_to_ids("<|state_start|>") != getattr(tokenizer, "unk_token_id", -1)
-        )
+        # Check for Gemma in-vocab reserved tokens (<unused0>..<unusedN>)
+        # Gemma models MUST always use in-vocab mapping to protect the 42 Per-Layer Embeddings (PLE)
+        # and prevent out-of-bounds embedding gather asserts.
         has_unused = (
-            not has_existing_custom
-            and hasattr(tokenizer, "convert_tokens_to_ids")
+            hasattr(tokenizer, "convert_tokens_to_ids")
             and tokenizer.convert_tokens_to_ids("<unused0>") is not None
             and tokenizer.convert_tokens_to_ids("<unused0>") != getattr(tokenizer, "unk_token_id", -1)
+        )
+        has_existing_custom = (
+            not has_unused
+            and hasattr(tokenizer, "convert_tokens_to_ids")
+            and tokenizer.convert_tokens_to_ids("<|state_start|>") is not None
+            and tokenizer.convert_tokens_to_ids("<|state_start|>") != getattr(tokenizer, "unk_token_id", -1)
         )
 
         if has_unused:
