@@ -12,6 +12,10 @@ jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,6 +32,23 @@ jobs:
 
       - name: Validate distribution metadata
         run: uvx twine check dist/*
+
+      - name: GPG Detached Sign Python Packages (if GPG key provided)
+        env:
+          GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY || secrets.MAVEN_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE || secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          if [ -n "${GPG_KEY}" ]; then
+            echo "${GPG_KEY}" | gpg --batch --import
+            for f in dist/*; do
+              gpg --batch --yes --armor --pinentry-mode loopback --passphrase "${GPG_PASSPHRASE}" --detach-sign "$f"
+            done
+          fi
+
+      - name: Attest Python Distribution Provenance (Sigstore)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/*'
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
