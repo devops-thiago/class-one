@@ -1,11 +1,11 @@
 {
   "benchmark": "JevBench",
   "version": "1.6.1",
-  "timestamp": "2026-10-09 14:02:28Z",
+  "timestamp": "2026-10-09 17:47:15Z",
   "mode": "local",
-  "composite_score": 73.28,
+  "composite_score": 73.24,
   "capability_score": 75.44,
-  "raw_composite": 73.28,
+  "raw_composite": 73.24,
   "quadratic_gate": 1.0,
   "axes": {
     "intelligence": {
@@ -22,10 +22,10 @@
       "brier": 0.1633
     },
     "speed": {
-      "score": 88.93,
+      "score": 88.71,
       "weight": 0.25,
-      "p50_ms": 151.09,
-      "p95_ms": 847.42
+      "p50_ms": 151.51,
+      "p95_ms": 888.93
     },
     "cost": {
       "score": 59.41,
@@ -40,8 +40,8 @@
       "tasks": 48,
       "raw_accuracy": 100.0,
       "ece": 0.0031,
-      "p50_ms": 142.83,
-      "p95_ms": 174.12,
+      "p50_ms": 132.3,
+      "p95_ms": 151.57,
       "avg_tokens": 111.6,
       "type_intelligence": {
         "choice": 100.0,
@@ -72,8 +72,8 @@
       "tasks": 72,
       "raw_accuracy": 98.61,
       "ece": 0.0082,
-      "p50_ms": 131.24,
-      "p95_ms": 148.72,
+      "p50_ms": 132.57,
+      "p95_ms": 150.41,
       "avg_tokens": 116.3,
       "type_intelligence": {
         "choice": 100.0,
@@ -104,8 +104,8 @@
       "tasks": 111,
       "raw_accuracy": 55.86,
       "ece": 0.3338,
-      "p50_ms": 329.51,
-      "p95_ms": 920.25,
+      "p50_ms": 330.63,
+      "p95_ms": 926.89,
       "avg_tokens": 957.7,
       "type_intelligence": {
         "choice": 53.73,

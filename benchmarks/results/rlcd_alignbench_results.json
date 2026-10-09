@@ -9,9 +9,9 @@
     "balanced_accuracy": 62.93,
     "ece": 0.2252,
     "brier_score": 0.2959,
-    "latency_p50_ms": 681.99,
-    "latency_mean_ms": 721.42,
-    "latency_p95_ms": 1154.25
+    "latency_p50_ms": 724.48,
+    "latency_mean_ms": 762.1,
+    "latency_p95_ms": 1222.31
   },
   "per_axis": {
     "bias": {
@@ -19,70 +19,70 @@
       "auroc": 0.575,
       "accuracy": 55.6,
       "ece": 0.096,
-      "p50_latency_ms": 730.05
+      "p50_latency_ms": 777.28
     },
     "concealing_uncertainty": {
       "n": 14,
       "auroc": 0.755,
       "accuracy": 85.7,
       "ece": 0.3511,
-      "p50_latency_ms": 448.75
+      "p50_latency_ms": 476.77
     },
     "faithfulness": {
       "n": 9,
       "auroc": 0.75,
       "accuracy": 66.7,
       "ece": 0.1549,
-      "p50_latency_ms": 764.04
+      "p50_latency_ms": 770.1
     },
     "honesty": {
       "n": 11,
       "auroc": 0.9,
       "accuracy": 81.8,
       "ece": 0.1862,
-      "p50_latency_ms": 733.22
+      "p50_latency_ms": 776.94
     },
     "power_seeking": {
       "n": 6,
       "auroc": 0.889,
       "accuracy": 83.3,
       "ece": 0.189,
-      "p50_latency_ms": 717.09
+      "p50_latency_ms": 763.94
     },
     "privacy": {
       "n": 14,
       "auroc": 0.612,
       "accuracy": 50.0,
       "ece": 0.3799,
-      "p50_latency_ms": 568.6
+      "p50_latency_ms": 603.21
     },
     "prompt_injection": {
       "n": 8,
       "auroc": 0.562,
       "accuracy": 50.0,
       "ece": 0.395,
-      "p50_latency_ms": 583.94
+      "p50_latency_ms": 619.04
     },
     "refusal": {
       "n": 11,
       "auroc": 0.8,
       "accuracy": 72.7,
       "ece": 0.1569,
-      "p50_latency_ms": 957.63
+      "p50_latency_ms": 958.1
     },
     "reward_hacking": {
       "n": 9,
       "auroc": 0.45,
       "accuracy": 44.4,
       "ece": 0.4958,
-      "p50_latency_ms": 702.65
+      "p50_latency_ms": 750.89
     },
     "sycophancy": {
       "n": 9,
       "auroc": 0.35,
       "accuracy": 33.3,
       "ece": 0.4248,
-      "p50_latency_ms": 661.66
+      "p50_latency_ms": 706.09
     }
   }
 }

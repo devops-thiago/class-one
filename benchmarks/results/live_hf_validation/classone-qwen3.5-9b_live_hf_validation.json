@@ -1,0 +1,66 @@
+{
+  "repo_id": "devops-thiago/classone-qwen3.5-9b",
+  "head_sha256": "e1f67a8c6418d20cca876b65a0ef323f0c93b26e81df277af909891d6bf5ea0d",
+  "jevbench": {
+    "overall_accuracy": 78.35497835497836,
+    "total_correct": 181,
+    "total_tasks": 231,
+    "tiers": {
+      "easy": {
+        "correct": 48,
+        "total": 48,
+        "accuracy": 100.0,
+        "latency_s": 6.892610099981539
+      },
+      "original": {
+        "correct": 71,
+        "total": 72,
+        "accuracy": 98.61111111111111,
+        "latency_s": 9.849674200057052
+      },
+      "hard": {
+        "correct": 62,
+        "total": 111,
+        "accuracy": 55.85585585585585,
+        "latency_s": 54.93553600006271
+      }
+    }
+  },
+  "decision_index": {
+    "overall_decision_index": 100.0,
+    "total_correct": 50,
+    "total_tasks": 50,
+    "domains": {
+      "knowledge": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "language": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "retrieval": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "rubric": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "tools": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      }
+    }
+  },
+  "rlcd_alignbench": {
+    "overall_auroc": 0.5596238495398159,
+    "balanced_accuracy": 50.48019207683073,
+    "total_instances": 100
+  }
+}

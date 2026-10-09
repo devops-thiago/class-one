@@ -1,0 +1,61 @@
+{
+  "repo_id": "devops-thiago/classone-qwen3.5-4b",
+  "head_sha256": "38c30a103af128d3c49eb9dc5463a2973b2ba5497e1dd2eaf697e78fd5117262",
+  "jevbench": {
+    "overall_accuracy": 73.59307359307358,
+    "total_correct": 170,
+    "total_tasks": 231,
+    "tiers": {
+      "easy": {
+        "correct": 48,
+        "total": 48,
+        "accuracy": 100.0,
+        "latency_s": 5.162265299935825
+      },
+      "original": {
+        "correct": 69,
+        "total": 72,
+        "accuracy": 95.83333333333334,
+        "latency_s": 6.947019200073555
+      },
+      "hard": {
+        "correct": 53,
+        "total": 111,
+        "accuracy": 47.74774774774775,
+        "latency_s": 36.503093800041825
+      }
+    }
+  },
+  "decision_index": {
+    "overall_decision_index": 98.0,
+    "total_correct": 49,
+    "total_tasks": 50,
+    "domains": {
+      "knowledge": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "language": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "retrieval": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      },
+      "rubric": {
+        "correct": 9,
+        "total": 10,
+        "accuracy": 90.0
+      },
+      "tools": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 100.0
+      }
+    }
+  }
+}
