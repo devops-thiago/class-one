@@ -1,0 +1,22 @@
+{
+  "model_name": "ClassOne System 1 Decision Engine (Qwen 3.5 9B Champion)",
+  "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
+  "architecture": "Qwen 3.5 9B Backbone + Bilinear Decision Heads",
+  "parameters": "9.2B",
+  "quantization": "4bit NF4 / BF16",
+  "license": "apache-2.0",
+  "submission_date": "2026-10-09",
+  "hardware_environment": "2x NVIDIA RTX 5060 Ti 16GB",
+  "overall_index": 100.0,
+  "domain_scores": {
+    "knowledge": 100.0,
+    "language": 100.0,
+    "retrieval": 100.0,
+    "tools": 100.0,
+    "rubric": 100.0
+  },
+  "metrics": {
+    "ece": 0.0051,
+    "latency_p50_ms": 149.96
+  }
+}

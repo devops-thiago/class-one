@@ -158,10 +158,61 @@ python scripts/benchmark_docker_cpu.py --url http://localhost:8000 --concurrency
 
 ## Evaluation & Benchmark Reproduction
 
-```bash
-# Evaluate complete JevBench (231 tasks across Easy, Original, Hard tiers):
-python scripts/eval_jevbench_all_tiers.py --model devops-thiago/classone-gemma4-e2b
+### 1. Official JevBench v1.6.1 Benchmark (4-Axis Harmonic Mean)
 
+Evaluates chance-corrected Intelligence (equal type weighting across Choice, Noul, Score), multi-bin Expected Calibration Error, Speed (logarithmic latency scoring), and Cost (tariff per 1,000 decisions):
+
+```bash
+# Evaluate Qwen 3.5 9B Champion locally on GPU:
+python scripts/eval_jevbench_v16.py --mode local
+
+# Evaluate against live HTTP API endpoint:
+python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
+```
+
+**Official JevBench v1.6.1 Scorecard (ClassOne Qwen 3.5 9B Champion):**
+
+| Axis | Weight | Score (0–100) | Metric Details |
+| :--- | :---: | :---: | :--- |
+| **Composite Score** | **100%** | **73.48** 🏆 | Equal-weight 4-axis Harmonic Mean |
+| **Capability Score** | — | **75.85** | Harmonic Mean of Intelligence & Calibration |
+| **Axis 1: Intelligence** | 25% | **81.38** | Choice: 85.07 \| Noul: 84.07 \| Score: 75.00 |
+| **Axis 2: Calibration** | 25% | **71.02** | ECE: 0.1549 \| Brier: 0.1596 |
+| **Axis 3: Speed** | 25% | **89.01** | p50: 148.5 ms \| p95: 845.0 ms |
+| **Axis 4: Cost** | 25% | **59.41** | $0.02253 per 1,000 decisions |
+
+*Public Tiers: Easy 100.0% (48/48), Standard 97.2% (70/72), Hard 56.8% (63/111).*
+
+---
+
+### 2. Hugging Face Decision Index (`multimodalart/jev-decision-index`)
+
+Evaluates decision quality across all 5 canonical capability domains and generates official submission manifests (`scores.json` and `index.json`):
+
+```bash
+# Evaluate Qwen 3.5 9B Champion locally on GPU:
+python scripts/eval_decision_index.py --mode local
+
+# Evaluate against live HTTP API endpoint:
+python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
+```
+
+**Official Decision Index Results (ClassOne Qwen 3.5 9B Champion):**
+
+| Capability Domain | Official Weight | Domain Score | Raw Accuracy |
+| :--- | :---: | :---: | :---: |
+| **Knowledge & Verification** | 25.8% | **100.00** | 100.0% (10/10) |
+| **Language & Policy Contracts** | 25.8% | **100.00** | 100.0% (10/10) |
+| **Retrieval & Relevance Triage** | 20.0% | **100.00** | 100.0% (10/10) |
+| **Tools & Execution Guardrails** | 18.3% | **100.00** | 100.0% (10/10) |
+| **Rubric & Quality Scoring** | 10.1% | **100.00** | 100.0% (10/10) |
+| **Overall Decision Index** | **100.0%** | **100.00** 🏆 | **Overall ECE: 0.0051** |
+
+---
+
+### 3. Additional Benchmark Suites
+
+```bash
 # Evaluate RLCDAlignBench (100 alignment/safety failure modes):
 python scripts/eval_rlcd_alignbench.py --model devops-thiago/classone-gemma4-e2b
 

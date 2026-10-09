@@ -1,0 +1,135 @@
+{
+  "benchmark": "JevBench",
+  "version": "1.6.1",
+  "timestamp": "2026-10-09 12:34:33Z",
+  "mode": "local",
+  "composite_score": 73.48,
+  "capability_score": 75.85,
+  "raw_composite": 73.48,
+  "quadratic_gate": 1.0,
+  "axes": {
+    "intelligence": {
+      "score": 81.38,
+      "weight": 0.25,
+      "choice_intelligence": 85.07,
+      "noul_intelligence": 84.07,
+      "score_intelligence": 75.0
+    },
+    "calibration": {
+      "score": 71.02,
+      "weight": 0.25,
+      "ece": 0.1549,
+      "brier": 0.1596
+    },
+    "speed": {
+      "score": 89.01,
+      "weight": 0.25,
+      "p50_ms": 148.54,
+      "p95_ms": 845.01
+    },
+    "cost": {
+      "score": 59.41,
+      "weight": 0.25,
+      "cost_per_1k_decisions_usd": 0.022534,
+      "tariff_per_m_tokens": 0.042
+    }
+  },
+  "tiers": [
+    {
+      "tier": "Easy",
+      "tasks": 48,
+      "raw_accuracy": 100.0,
+      "ece": 0.0,
+      "p50_ms": 115.51,
+      "p95_ms": 149.09,
+      "avg_tokens": 111.6,
+      "type_intelligence": {
+        "choice": 100.0,
+        "noul": 100.0,
+        "score": 0.0
+      },
+      "type_stats": {
+        "choice": {
+          "correct": 36,
+          "total": 36,
+          "accuracy": 100.0
+        },
+        "noul": {
+          "correct": 12,
+          "total": 12,
+          "accuracy": 100.0
+        },
+        "score": {
+          "correct": 0,
+          "total": 0,
+          "accuracy": 0.0
+        }
+      },
+      "tier_weight": 0.1
+    },
+    {
+      "tier": "Standard",
+      "tasks": 72,
+      "raw_accuracy": 97.22,
+      "ece": 0.0318,
+      "p50_ms": 114.91,
+      "p95_ms": 148.65,
+      "avg_tokens": 116.3,
+      "type_intelligence": {
+        "choice": 100.0,
+        "noul": 91.67,
+        "score": 100.0
+      },
+      "type_stats": {
+        "choice": {
+          "correct": 36,
+          "total": 36,
+          "accuracy": 100.0
+        },
+        "noul": {
+          "correct": 22,
+          "total": 24,
+          "accuracy": 91.67
+        },
+        "score": {
+          "correct": 12,
+          "total": 12,
+          "accuracy": 100.0
+        }
+      },
+      "tier_weight": 0.4
+    },
+    {
+      "tier": "Hard",
+      "tasks": 111,
+      "raw_accuracy": 56.76,
+      "ece": 0.308,
+      "p50_ms": 328.36,
+      "p95_ms": 918.69,
+      "avg_tokens": 957.7,
+      "type_intelligence": {
+        "choice": 55.22,
+        "noul": 60.53,
+        "score": 50.0
+      },
+      "type_stats": {
+        "choice": {
+          "correct": 37,
+          "total": 67,
+          "accuracy": 55.22
+        },
+        "noul": {
+          "correct": 23,
+          "total": 38,
+          "accuracy": 60.53
+        },
+        "score": {
+          "correct": 3,
+          "total": 6,
+          "accuracy": 50.0
+        }
+      },
+      "tier_weight": 0.5
+    }
+  ]
+}

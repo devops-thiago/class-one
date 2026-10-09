@@ -1,0 +1,47 @@
+{
+  "benchmark": "Hugging Face Decision Index",
+  "space": "multimodalart/jev-decision-index",
+  "timestamp": "2026-10-09 12:32:59Z",
+  "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
+  "overall_decision_index": 100.0,
+  "overall_ece": 0.0051,
+  "latency_p50_ms": 149.96,
+  "latency_p95_ms": 184.47,
+  "radar_metrics": {
+    "knowledge": {
+      "name": "Knowledge & Verification",
+      "score": 100.0,
+      "weight": 0.258,
+      "raw_accuracy": 100.0,
+      "tasks": 10
+    },
+    "language": {
+      "name": "Language & Policy Contracts",
+      "score": 100.0,
+      "weight": 0.258,
+      "raw_accuracy": 100.0,
+      "tasks": 10
+    },
+    "retrieval": {
+      "name": "Retrieval & Relevance Triage",
+      "score": 100.0,
+      "weight": 0.2,
+      "raw_accuracy": 100.0,
+      "tasks": 10
+    },
+    "tools": {
+      "name": "Tools & Execution Guardrails",
+      "score": 100.0,
+      "weight": 0.183,
+      "raw_accuracy": 100.0,
+      "tasks": 10
+    },
+    "rubric": {
+      "name": "Rubric & Quality Scoring",
+      "score": 100.0,
+      "weight": 0.101,
+      "raw_accuracy": 100.0,
+      "tasks": 10
+    }
+  }
+}

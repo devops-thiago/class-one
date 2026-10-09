@@ -47,5 +47,6 @@ scripts/migrate_cache_to_e.py
 scripts/test_all_hf_models_sdk.py
 
 # Local datasets and external tools
-data/
+data/*
+!data/decision_index/
 tools/
