@@ -174,6 +174,33 @@ class ClassOneResponse:
     def __contains__(self, key: str) -> bool:
         return key in self.answers
 
+    def choice(self, key: str) -> ChoiceAnswer | None:
+        """Returns the ChoiceAnswer for question ID, or None if not found."""
+        return self.choices.get(key)
+
+    def noul(self, key: str) -> NoulAnswer | None:
+        """Returns the NoulAnswer for question ID, or None if not found."""
+        return self.nouls.get(key)
+
+    def score(self, key: str) -> ScoreAnswer | None:
+        """Returns the ScoreAnswer for question ID, or None if not found."""
+        return self.scores.get(key)
+
+    def selected_choice(self, key: str) -> str | None:
+        """Returns the selected choice string or None if not found."""
+        ch = self.choice(key)
+        return ch.choice if ch else None
+
+    def noul_probability(self, key: str) -> float:
+        """Returns the calibrated binary probability or 0.0 if not found."""
+        n = self.noul(key)
+        return n.noul if n else 0.0
+
+    def rubric_score(self, key: str) -> float:
+        """Returns the continuous rubric score or 0.0 if not found."""
+        s = self.score(key)
+        return s.score if s else 0.0
+
 
 class BaseClassOneClient:
     """Shared client configuration and payload formatting."""
