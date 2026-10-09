@@ -115,3 +115,46 @@ def test_compute_ece():
     accs_bad = [0.0, 0.0, 0.0, 0.0]
     ece_bad = compute_ece(confs_bad, accs_bad)
     assert ece_bad > 0.8
+
+
+def test_classone_adapter_protocol():
+    from classone_adapter import ClassOneAdapter, DecisionResult
+    from classone.adapter import ClassOneAdapter as PkgAdapter
+
+    assert ClassOneAdapter is PkgAdapter
+    adapter = ClassOneAdapter()
+    assert hasattr(adapter, "prepare")
+    assert hasattr(adapter, "run")
+    assert adapter.name == "classone_local"
+    assert adapter.pause_tokens == 8
+
+    # Test noul request parsing
+    noul_task = {
+        "state": "Document text",
+        "question": {"type": "noul", "instructions": "Is policy compliant?"},
+        "labels": ["no", "yes"],
+    }
+    req = adapter.build_request(noul_task)
+    assert req["q_type"] == "noul"
+    assert "no" in req["criteria"] and "yes" in req["criteria"]
+
+    # Test choice request parsing
+    choice_task = {
+        "state": "Clinical scenario",
+        "question": {
+            "type": "choice",
+            "instructions": "Select diagnosis",
+            "criteria": {"A": "Asthma", "B": "COPD"},
+        },
+    }
+    req_choice = adapter.build_request(choice_task)
+    assert req_choice["q_type"] == "choice"
+    assert req_choice["criteria"]["A"] == "Asthma"
+    assert req_choice["labels"] == ["A", "B"]
+
+    # Test DecisionResult structure
+    res = DecisionResult(adapter="classone_local", ok=True, probs={"no": 0.1, "yes": 0.9})
+    pub = res.to_public()
+    assert pub["adapter"] == "classone_local"
+    assert pub["ok"] is True
+    assert pub["probs"]["yes"] == 0.9
