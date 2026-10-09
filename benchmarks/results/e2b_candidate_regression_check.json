@@ -1,0 +1,51 @@
+{
+  "model": "e2b_top3_candidate",
+  "jevbench": {
+    "overall": 62.33766233766234,
+    "tiers": {
+      "easy": {
+        "correct": 48,
+        "total": 48,
+        "accuracy": 100.0,
+        "latency_s": 3.7150243999203667
+      },
+      "original": {
+        "correct": 58,
+        "total": 72,
+        "accuracy": 80.55555555555556,
+        "latency_s": 5.168786099995486
+      },
+      "hard": {
+        "correct": 38,
+        "total": 111,
+        "accuracy": 34.234234234234236,
+        "latency_s": 18.524161099921912
+      }
+    }
+  },
+  "decision_index": {
+    "overall": 80.0,
+    "domains": {
+      "knowledge": {
+        "correct": 8,
+        "total": 10
+      },
+      "language": {
+        "correct": 8,
+        "total": 10
+      },
+      "retrieval": {
+        "correct": 9,
+        "total": 10
+      },
+      "rubric": {
+        "correct": 7,
+        "total": 10
+      },
+      "tools": {
+        "correct": 8,
+        "total": 10
+      }
+    }
+  }
+}

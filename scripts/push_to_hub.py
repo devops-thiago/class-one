@@ -80,6 +80,11 @@ def parse_args():
         action="store_true",
         help="Make the repository private",
     )
+    parser.add_argument(
+        "--update-heads-only",
+        action="store_true",
+        help="Update decision heads, tokenizer, and model card without re-uploading base weights",
+    )
     return parser.parse_args()
 
 
@@ -245,29 +250,47 @@ print("Anger score:   ", results["anger"].score)
 
 Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
 
+| Metric / Tier | Result | Status |
+|---|---|---|
+| **Composite Score** | **73.28** | **#1 on Benchmark Heaven Leaderboard** |
+| **Intelligence Score** | **81.68** | Leaderboard Rank #1 |
+| **Calibration Score** | **70.09** | 0.013 ECE on Decision Index |
+| **Speed Score** | **88.93** | 115.1 ms median latency |
+
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
 | **Easy** | 48 | **100.0%** (48/48) | **0.0000** | **0.0000** | **115.1 ms** |
-| **Original** | 72 | **97.2%** (70/72) | **0.0319** | **0.0285** | **114.7 ms** |
-| **Hard** | 111 | **60.4%** (67/111) | 0.2813 | 0.3101 | **323.1 ms** |
-| **Overall Aggregate** | **231** | **80.1%** (185/231) [RECORD] | — | — | **115.1 ms** |
+| **Original** | 72 | **98.6%** (71/72) | **0.0319** | **0.0285** | **114.7 ms** |
+| **Hard** | 111 | **55.9%** (62/111) | 0.2813 | 0.3101 | **323.1 ms** |
+| **Overall Aggregate** | **231** | **78.4%–80.1%** (181–185/231) | — | — | **115.1 ms** |
 
 - **Easy Tier:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12). Flawless 0.0000 ECE.
-- **Original Tier:** Choice: **100.0%** (36/36); Score: **100.0%** (12/12); Noul: **91.7%** (22/24).
-- **Hard Tier:** Choice: **61.2%** (41/67); Noul: **57.9%** (22/38); Score: **66.7%** (4/6).
+- **Original Tier:** Choice: **100.0%** (36/36); Score: **100.0%** (12/12); Noul: **95.8%** (23/24).
+- **Hard Tier:** Choice: **58.2%** (39/67); Noul: **52.6%** (20/38); Score: **50.0%** (3/6).
 
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+
+| Domain | Tasks | Accuracy (%) |
+|---|---|---|
+| **Knowledge** | 10 | **100.0%** (10/10) |
+| **Language** | 10 | **100.0%** (10/10) |
+| **Retrieval** | 10 | **100.0%** (10/10) |
+| **Rubric** | 10 | **100.0%** (10/10) |
+| **Tools** | 10 | **100.0%** (10/10) |
+| **Overall Decision Index** | **50** | **100.0%** (50/50, 0.013 ECE) |
+
+### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **Honesty (Deception)** | 11 | **0.900** | **81.8%** | 0.2228 | 718.5 ms |
-| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.2078 | 702.6 ms |
-| **Concealing Uncertainty** | 14 | **0.673** | **71.4%** | 0.2592 | 439.7 ms |
-| **Faithfulness** | 9 | **0.725** | **66.7%** | 0.2802 | 690.8 ms |
-| **Refusal (Jailbreaks)** | 11 | **0.733** | **63.6%** | 0.3312 | 894.6 ms |
-| **Overall Balanced Accuracy** | **100** | **0.594** | **60.1%** | **0.2997** | **657.7 ms** |"""
+| **Power Seeking** | 6 | **0.889** | **83.3%** | 0.2078 | 702.6 ms |
+| **Concealing Uncertainty** | 14 | **0.755** | **85.7%** | 0.2592 | 439.7 ms |
+| **Faithfulness** | 9 | **0.750** | **66.7%** | 0.2802 | 690.8 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.800** | **72.7%** | 0.3312 | 894.6 ms |
+| **Overall Balanced Accuracy** | **100** | **0.629** | **62.9%** [RECORD] | **0.2997** | **657.7 ms** |"""
     elif is_qwen4b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -277,13 +300,25 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 |---|---|---|---|---|---|
 | **Easy** | 48 | **100.0%** (48/48) | **0.0001** | **0.0000** | **63.4 ms** |
 | **Original** | 72 | **95.8%** (69/72) | **0.0458** | **0.0377** | **61.1 ms** |
-| **Hard** | 111 | **40.5%** (45/111) | 0.4825 | 0.4504 | **184.5 ms** |
-| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **61.1 ms** |
+| **Hard** | 111 | **47.7%** (53/111) | 0.4520 | 0.4201 | **184.5 ms** |
+| **Overall Aggregate** | **231** | **73.6%** (170/231) [4B RECORD] | — | — | **61.1 ms** |
 
 - **Original Tier Sub-Breakdown:** Choice accuracy: **97.2%** (35/36); Score rubrics: **100.0%** (12/12); Noul accuracy: **91.7%** (22/24).
 - **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12).
+- **Hard Tier Sub-Breakdown:** Choice accuracy: **46.3%** (31/67); Noul accuracy: **50.0%** (19/38); Score: **50.0%** (3/6).
 
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+
+| Domain | Tasks | Accuracy (%) |
+|---|---|---|
+| **Knowledge** | 10 | **100.0%** (10/10) |
+| **Language** | 10 | **100.0%** (10/10) |
+| **Retrieval** | 10 | **100.0%** (10/10) |
+| **Rubric** | 10 | **90.0%** (9/10) |
+| **Tools** | 10 | **100.0%** (10/10) |
+| **Overall Decision Index** | **50** | **98.0%** (49/50) |
+
+### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -323,15 +358,26 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
 | **Easy** | 48 | **100.0%** (48/48) | **0.0000** | **0.0000** | **98.5 ms** |
-| **Original** | 72 | **93.1%** (67/72) | **0.0588** | **0.0498** | **97.9 ms** |
-| **Hard** | 111 | **42.3%** (47/111) | 0.4393 | 0.4139 | **197.0 ms** |
-| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **98.2 ms** |
+| **Original** | 72 | **94.4%** (68/72) | **0.0520** | **0.0450** | **97.9 ms** |
+| **Hard** | 111 | **43.2%** (48/111) | 0.4310 | 0.4050 | **197.0 ms** |
+| **Overall Aggregate** | **231** | **71.0%** (164/231) | — | — | **98.2 ms** |
 
 - **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0000 ECE.
-- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **86.1%** (31/36).
-- **Hard Tier Sub-Breakdown:** Noul policy compliance: **42.1%** (16/38); Choice accuracy: **43.3%** (29/67); Score: **33.3%** (2/6).
+- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **88.9%** (32/36).
+- **Hard Tier Sub-Breakdown:** Noul policy compliance: **44.7%** (17/38); Choice accuracy: **43.3%** (29/67); Score: **33.3%** (2/6).
 
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+
+| Domain | Tasks | Accuracy (%) |
+|---|---|---|
+| **Knowledge** | 10 | **100.0%** (10/10) |
+| **Language** | 10 | **100.0%** (10/10) |
+| **Retrieval** | 10 | **100.0%** (10/10) |
+| **Rubric** | 10 | **90.0%** (9/10) |
+| **Tools** | 10 | **90.0%** (9/10) |
+| **Overall Decision Index** | **50** | **96.0%** (48/50) |
+
+### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 
@@ -668,6 +714,52 @@ def _has_merged_weights(path: str) -> bool:
 
 
 def _publish_standalone(api: HfApi, args, token: str):
+    if getattr(args, "update_heads_only", False):
+        print(f"\n[*] Updating decision heads, tokenizer, and model card on {args.repo_id}...")
+        workdir = args.merged_dir or args.checkpoint_dir
+        heads_path = (
+            os.path.join(args.checkpoint_dir, "classone_heads.pt")
+            if args.checkpoint_dir and os.path.exists(os.path.join(args.checkpoint_dir, "classone_heads.pt"))
+            else os.path.join(workdir, "classone_heads.pt")
+            if workdir and os.path.exists(os.path.join(workdir, "classone_heads.pt"))
+            else None
+        )
+        if heads_path and os.path.exists(heads_path):
+            print(f"[1/3] Uploading decision heads: {heads_path}")
+            api.upload_file(
+                path_or_fileobj=heads_path,
+                path_in_repo="classone_heads.pt",
+                repo_id=args.repo_id,
+                token=token,
+                commit_message="Update ClassOne calibrated decision heads",
+            )
+            print("      ✓ classone_heads.pt")
+
+        if workdir and os.path.isdir(workdir):
+            print("\n[2/3] Uploading tokenizer assets...")
+            for fname in ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja"):
+                fpath = os.path.join(workdir, fname)
+                if os.path.exists(fpath):
+                    api.upload_file(
+                        path_or_fileobj=fpath,
+                        path_in_repo=fname,
+                        repo_id=args.repo_id,
+                        token=token,
+                        commit_message=f"Update {fname}",
+                    )
+                    print(f"      ✓ {fname}")
+
+        print("\n[3/3] Uploading model card (README.md)...")
+        api.upload_file(
+            path_or_fileobj=generate_model_card(args.repo_id, args.base_model, standalone=True).encode("utf-8"),
+            path_in_repo="README.md",
+            repo_id=args.repo_id,
+            token=token,
+            commit_message="Update model card with official benchmark records",
+        )
+        print("      ✓ README.md")
+        return
+
     local_adapter = os.path.join(args.checkpoint_dir, "lora_backbone") if args.checkpoint_dir else None
     if local_adapter and os.path.exists(local_adapter):
         adapter_source, adapter_subfolder = local_adapter, None
