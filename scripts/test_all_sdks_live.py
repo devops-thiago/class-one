@@ -23,6 +23,9 @@ import sys
 import time
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 import httpx
 
 from classone import Choice, ClassOneClient, Noul, Score

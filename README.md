@@ -181,6 +181,27 @@ python scripts/test_all_hf_models_sdk.py
 
 ---
 
+## Client SDKs & Package Distribution
+
+ClassOne provides official client libraries across 6 languages with native HTTP transports, zero unnecessary dependencies, and type-safe probabilistic primitives (`Noul`, `Choice`, `Score`):
+
+| Language | Package Registry | Installation / Dependency | Repository |
+|---|---|---|---|
+| **Python** | [PyPI (`classone`)](https://pypi.org/project/classone/) | `pip install classone` | Built-in (`src/classone/sdk`) |
+| **Node.js / TS** | [npm (`@classone/sdk`)](https://www.npmjs.com/package/@classone/sdk) | `npm install @classone/sdk` | [`classone-sdks/nodejs`](https://github.com/devops-thiago/classone-sdks/tree/main/nodejs) |
+| **Go** | [pkg.go.dev](https://pkg.go.dev/github.com/devops-thiago/classone-sdks/go) | `go get github.com/devops-thiago/classone-sdks/go@v0.1.1` | [`classone-sdks/go`](https://github.com/devops-thiago/classone-sdks/tree/main/go) |
+| **Rust** | [crates.io (`classone`)](https://crates.io/crates/classone) | `cargo add classone` | [`classone-sdks/rust`](https://github.com/devops-thiago/classone-sdks/tree/main/rust) |
+| **Java** | [Maven Central (`io.classone:classone-sdk`)](https://central.sonatype.com/artifact/io.classone/classone-sdk) | `implementation 'io.classone:classone-sdk:0.1.1'` | [`classone-sdks/java`](https://github.com/devops-thiago/classone-sdks/tree/main/java) |
+| **Ruby** | [RubyGems (`classone`)](https://rubygems.org/gems/classone) | `gem install classone` | [`classone-sdks/ruby`](https://github.com/devops-thiago/classone-sdks/tree/main/ruby) |
+
+To verify all SDKs against a running server:
+```bash
+python scripts/test_all_sdks_live.py --url http://127.0.0.1:8000
+python scripts/package_and_verify_all_sdks.py
+```
+
+---
+
 ## License & Attribution
 
 - Released under the [Apache 2.0 License](LICENSE).
