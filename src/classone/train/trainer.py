@@ -44,6 +44,7 @@ class ClassOneTrainer:
         lr: float = 1e-4,
         weight_decay: float = 0.01,
         device: str | torch.device | None = None,
+        heads_only: bool = False,
     ):
         self.model = model
         self.prompt_builder = prompt_builder
@@ -51,7 +52,15 @@ class ClassOneTrainer:
         self.lr = lr
         self.weight_decay = weight_decay
         self.device = torch.device(device) if device else self.model.device
+        self.heads_only = heads_only
         self.model.to(self.device)
+
+        if self.heads_only:
+            for p in self.model.backbone.parameters():
+                p.requires_grad = False
+            for head in [self.model.noul_head, self.model.choice_head, self.model.score_head]:
+                for p in head.parameters():
+                    p.requires_grad = True
 
         # Initialize optimizer for decision heads and trainable backbone parameters
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
@@ -170,7 +179,11 @@ class ClassOneTrainer:
         for item, packed in packed_batch:
             input_ids = packed.input_ids.to(self.device)
             attention_mask = packed.attention_mask.to(self.device)
-            hidden_states = self.model.extract_hidden_states(input_ids=input_ids, attention_mask=attention_mask)
+            if self.heads_only:
+                with torch.no_grad():
+                    hidden_states = self.model.extract_hidden_states(input_ids=input_ids, attention_mask=attention_mask)
+            else:
+                hidden_states = self.model.extract_hidden_states(input_ids=input_ids, attention_mask=attention_mask)
             seq_hidden = hidden_states[0]
             head_dtype = next(self.model.noul_head.parameters()).dtype
             if seq_hidden.dtype != head_dtype:
@@ -385,9 +398,9 @@ class ClassOneTrainer:
                 temp_optimizer.step()
                 with torch.no_grad():
                     for raw_param, (min_t, max_t) in [
-                        (self.model.noul_head.temperature_raw, (0.45, 0.60)),
-                        (self.model.choice_head.temperature_raw, (0.45, 0.60)),
-                        (self.model.score_head.choice_evaluator.temperature_raw, (0.55, 0.65)),
+                        (self.model.noul_head.temperature_raw, (0.48, 0.52)),
+                        (self.model.choice_head.temperature_raw, (0.48, 0.52)),
+                        (self.model.score_head.choice_evaluator.temperature_raw, (0.52, 0.58)),
                     ]:
                         curr_t = F.softplus(raw_param) + 0.1
                         clamped_t = torch.clamp(curr_t, min=min_t, max=max_t)

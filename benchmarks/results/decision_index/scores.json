@@ -1,12 +1,12 @@
 {
   "benchmark": "Hugging Face Decision Index",
   "space": "multimodalart/jev-decision-index",
-  "timestamp": "2026-10-09 12:32:59Z",
+  "timestamp": "2026-10-09 14:04:04Z",
   "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
   "overall_decision_index": 100.0,
-  "overall_ece": 0.0051,
-  "latency_p50_ms": 149.96,
-  "latency_p95_ms": 184.47,
+  "overall_ece": 0.013,
+  "latency_p50_ms": 151.11,
+  "latency_p95_ms": 182.87,
   "radar_metrics": {
     "knowledge": {
       "name": "Knowledge & Verification",

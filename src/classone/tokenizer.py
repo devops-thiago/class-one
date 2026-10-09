@@ -30,6 +30,7 @@ SPECIAL_TOKENS = [
     "<|score_end|>",
     "<|level_start|>",
     "<|level_end|>",
+    "<|pause|>",
 ]
 
 
@@ -58,8 +59,9 @@ class PackedSequence:
 class ClassOnePromptBuilder:
     """Builds structured ClassOne decision prompts and maps delimiter token spans."""
 
-    def __init__(self, tokenizer: PreTrainedTokenizerBase):
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, default_pause_tokens: int = 0):
         self.tokenizer = tokenizer
+        self.default_pause_tokens = default_pause_tokens
         has_existing_custom = (
             hasattr(tokenizer, "convert_tokens_to_ids")
             and tokenizer.convert_tokens_to_ids("<|state_start|>") is not None
@@ -73,7 +75,7 @@ class ClassOnePromptBuilder:
         )
 
         if has_unused:
-            # Map delimiters to native in-vocab reserved tokens (<unused0>..<unused11>)
+            # Map delimiters to native in-vocab reserved tokens (<unused0>..<unused12>)
             # This avoids resizing the 42-layer Per-Layer Embeddings (PLE) in Gemma 4, saving 5.25 GB VRAM
             self.delimiter_map = {special: f"<unused{i}>" for i, special in enumerate(SPECIAL_TOKENS)}
             self.special_token_ids = {
@@ -95,12 +97,16 @@ class ClassOnePromptBuilder:
         self,
         state: str | dict[str, Any] | list[Any],
         questions: dict[str, Question],
+        num_pause_tokens: int | None = None,
     ) -> PackedSequence:
         """Packs state and questions into a single sequence with exact token positions.
 
         To guarantee exact token index tracking without tokenizer ambiguity, tokens
         are constructed segment-by-segment.
         """
+        if num_pause_tokens is None:
+            num_pause_tokens = self.default_pause_tokens
+
         d_state_start = self.delimiter_map["<|state_start|>"]
         d_state_end = self.delimiter_map["<|state_end|>"]
         d_noul_start = self.delimiter_map["<|noul_start|>"]
@@ -113,6 +119,7 @@ class ClassOnePromptBuilder:
         d_score_end = self.delimiter_map["<|score_end|>"]
         d_level_start = self.delimiter_map["<|level_start|>"]
         d_level_end = self.delimiter_map["<|level_end|>"]
+        d_pause = self.delimiter_map["<|pause|>"]
 
         state_str = self.serialize_state(state)
         state_prefix = f"{d_state_start}\n{state_str}\n{d_state_end}\n"
@@ -143,6 +150,13 @@ class ClassOnePromptBuilder:
         else:
             text_parts.append(state_prefix)
             current_ids.extend(prefix_ids)
+
+        # Inject latent pause tokens before questions to give transformer layers sequence depth
+        if num_pause_tokens > 0:
+            pause_text = (f"{d_pause} " * num_pause_tokens).strip() + "\n"
+            pause_ids = self.tokenizer.encode(pause_text, add_special_tokens=False, return_tensors=None)
+            current_ids.extend(pause_ids)
+            text_parts.append(pause_text)
 
         for q_id, q in questions.items():
             if isinstance(q, NoulQuestion):

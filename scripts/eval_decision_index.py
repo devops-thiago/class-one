@@ -112,7 +112,7 @@ class ApiEvaluator:
 class LocalEvaluator:
     """Evaluates tasks using local PyTorch model weights."""
 
-    def __init__(self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None):
+    def __init__(self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None, pause_tokens: int = 0):
         import torch
         from transformers import AutoTokenizer
 
@@ -121,9 +121,10 @@ class LocalEvaluator:
 
         self.torch = torch
         self.device = device
-        print(f"[*] Loading local ClassOne model from {model_path} on {device}...")
+        self.pause_tokens = pause_tokens
+        print(f"[*] Loading local ClassOne model from {model_path} on {device} (pause_tokens={pause_tokens})...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.builder = ClassOnePromptBuilder(self.tokenizer)
+        self.builder = ClassOnePromptBuilder(self.tokenizer, default_pause_tokens=pause_tokens)
         is_large = any(k in model_path.lower() for k in ["9b", "12b", "e4b", "4b"]) or quant is not None
         if quant is None and is_large:
             quant = "4bit"
@@ -294,6 +295,7 @@ def main():
     )
     parser.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device")
     parser.add_argument("--quant", default="4bit", help="Backbone quantization")
+    parser.add_argument("--pause-tokens", type=int, default=0, help="Number of latent pause tokens (default: 0)")
     args = parser.parse_args()
 
     print("\n" + "=" * 80)
@@ -305,7 +307,13 @@ def main():
     if args.mode == "api":
         evaluator = ApiEvaluator(endpoint_url=args.endpoint)
     else:
-        evaluator = LocalEvaluator(model_path=args.model_path, heads_path=args.heads_path, device=args.device, quant=args.quant)
+        evaluator = LocalEvaluator(
+            model_path=args.model_path,
+            heads_path=args.heads_path,
+            device=args.device,
+            quant=args.quant,
+            pause_tokens=args.pause_tokens,
+        )
 
     all_domain_results = []
     combined_latencies = []

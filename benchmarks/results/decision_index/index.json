@@ -16,7 +16,7 @@
     "rubric": 100.0
   },
   "metrics": {
-    "ece": 0.0051,
-    "latency_p50_ms": 149.96
+    "ece": 0.013,
+    "latency_p50_ms": 151.11
   }
 }

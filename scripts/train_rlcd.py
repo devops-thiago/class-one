@@ -143,6 +143,30 @@ def parse_args():
         choices=["4bit", "8bit", "nf4"],
         help="Quantization format for base model weights ('4bit' or '8bit')",
     )
+    parser.add_argument(
+        "--pause-tokens",
+        type=int,
+        default=0,
+        help="Number of latent <|pause|> tokens to inject before questions (default: 0)",
+    )
+    parser.add_argument(
+        "--margin-weight",
+        type=float,
+        default=0.5,
+        help="Weight for contrastive logit margin loss in RLCDLoss",
+    )
+    parser.add_argument(
+        "--margin-threshold",
+        type=float,
+        default=1.0,
+        help="Threshold margin between ground-truth and runner-up logit",
+    )
+    parser.add_argument(
+        "--heads-only",
+        action="store_true",
+        default=False,
+        help="Train only decision heads (freezing backbone with torch.no_grad for fast head training)",
+    )
     return parser.parse_args()
 
 
@@ -172,7 +196,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
         tok = Tokenizer(WordLevel(vocab=vocab, unk_token="[UNK]"))
         tok.pre_tokenizer = Whitespace()
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tok, unk_token="[UNK]", pad_token="[PAD]")
-        builder = ClassOnePromptBuilder(tokenizer)
+        builder = ClassOnePromptBuilder(tokenizer, default_pause_tokens=args.pause_tokens)
         config = ClassOneConfig(hidden_size=128, head_hidden_size=64)
         model = ClassOneModel(config)
     else:
@@ -180,7 +204,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
             print(f"[*] Loading backbone: {args.model}")
         try:
             tokenizer = AutoTokenizer.from_pretrained(args.model)
-            builder = ClassOnePromptBuilder(tokenizer)
+            builder = ClassOnePromptBuilder(tokenizer, default_pause_tokens=args.pause_tokens)
             model = ClassOneModel.from_backbone(
                 base_model_name_or_path=args.model,
                 tokenizer=tokenizer,
@@ -194,11 +218,22 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
             sys.exit(1)
 
     # Initialize Trainer and LoRA
+    from classone.modeling.loss import RLCDLoss
+
+    loss_fn = RLCDLoss(
+        brier_weight=0.5,
+        log_weight=1.0,
+        margin_weight=args.margin_weight,
+        margin_threshold=args.margin_threshold,
+        focal_gamma=2.0,
+    )
     trainer = ClassOneTrainer(
         model=model,
         prompt_builder=builder,
+        loss_fn=loss_fn,
         lr=args.lr,
         device=device,
+        heads_only=args.heads_only,
     )
 
     # Load pre-trained decision heads if fine-tuning from an existing ClassOne checkpoint or local heads
@@ -232,7 +267,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
             if is_main_process:
                 print(f"[!] Warning: Failed to load pre-trained heads: {e}")
 
-    if args.model != "standalone":
+    if args.model != "standalone" and not args.heads_only:
         if is_main_process:
             print(f"[*] Attaching LoRA adapters (r={args.lora_r}, alpha={args.lora_alpha})...")
         trainer.enable_lora(r=args.lora_r, lora_alpha=args.lora_alpha)
