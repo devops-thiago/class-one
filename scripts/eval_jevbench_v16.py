@@ -418,13 +418,13 @@ def main():
     parser.add_argument("--endpoint", default="http://127.0.0.1:8000/v1/decide", help="API endpoint URL")
     parser.add_argument(
         "--model-path",
-        default="worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged",
-        help="Local model weights",
+        default=os.environ.get("CLASSONE_MODEL", "devops-thiago/classone-qwen3.5-9b"),
+        help="Model checkpoint path or Hugging Face repo ID",
     )
     parser.add_argument(
         "--heads-path",
-        default="worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged/classone_heads.pt",
-        help="Decision heads file",
+        default=None,
+        help="Decision heads file (optional, defaults to classone_heads.pt inside model path)",
     )
     parser.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device")
     parser.add_argument("--quant", default="4bit", help="Backbone quantization (4bit or 8bit)")

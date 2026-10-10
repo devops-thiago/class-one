@@ -38,7 +38,7 @@ Fine-tuning `google/gemma-4-12B-it` in 4-bit NF4 precision with LoRA ($r=16, \al
 
 ## 4. Training Pipeline & Curriculum
 
-The 12B training pipeline inherits our balanced 15-domain Champion corpus (`data/champion_70pct_final_corpus.jsonl`, 23,503 items):
+The 12B training pipeline inherits our balanced 15-domain curriculum corpus (`data/composite_70pct_corpus.jsonl`, 23,503 items):
 1. **Multi-Clause Commercial Contracts (ContractNLI & CUAD):** 3840 hidden width allows the query token to aggregate scattered numerical calculations and policy limitations across 3,000-token agreements.
 2. **Multi-Level Ordinal Rubrics:** 4-level and 5-level rubrics (`SEV-1`–`SEV-4`, bursary award tiers 0–4).
 3. **Missing Evidence & Ambiguity Handling:** Calibrated abstention targets (`cannot_determine`).
@@ -75,11 +75,11 @@ The 12B training pipeline inherits our balanced 15-domain Champion corpus (`data
 
 ## 7. Comparative Pareto Analysis Across Model Scales
 
-| Metric / Dimension | Gemma 4 E2B | Gemma 4 E4B (Champion) | Gemma 4 12B | Takeaway & Recommendation |
+| Metric / Dimension | Gemma 4 E2B | Gemma 4 E4B | Gemma 4 12B | Takeaway & Recommendation |
 |---|---|---|---|---|
 | **Parameters** | 2.6B | 4.3B | **12.5B** | 12B scales representational channel to 3840 dims |
 | **Layers / Heads** | 35 / 8 | 42 / 8 | **48 / 16** | Deepest reasoning capacity on complex rubrics |
-| **JevBench Total** | 68.0% | **70.1% (162/231)** | 33.8% (78/231) | E4B is converged champion; 12B under-converged in 1 epoch |
+| **JevBench Total** | 68.0% | **70.1% (162/231)** | 33.8% (78/231) | E4B is converged production baseline; 12B under-converged in 1 epoch |
 | **AlignBench Balanced Acc** | 56.1% | **63.3%** | 47.6% | E4B holds balanced accuracy across all 10 axes |
 | **Honesty Accuracy** | 72.7% | 72.7% | **81.8%** | 12B sets all-time record on deception detection |
 | **Hard Tier Score Accuracy** | 33.3% | 33.3% | **66.7%** | 12B sets all-time record on complex ordinal rubrics |

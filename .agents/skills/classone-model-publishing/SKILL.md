@@ -44,7 +44,7 @@ Use the automated helper `scripts/prepare_candidate_for_hub.py`:
 ```powershell
 .venv\Scripts\python.exe scripts/prepare_candidate_for_hub.py `
   --snapshot-dir "checkpoints/snapshots/qwen9b_top3_candidate" `
-  --target-dir "worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged" `
+  --target-dir "checkpoints/classone_qwen9b_merged" `
   --repo-id "devops-thiago/classone-qwen3.5-9b" `
   --pause-tokens 8
 ```
@@ -68,7 +68,7 @@ Execute `scripts/push_to_hub.py` with `--update-heads-only`:
 
 ```powershell
 .venv\Scripts\python.exe scripts/push_to_hub.py `
-  --checkpoint-dir "worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged" `
+  --checkpoint-dir "checkpoints/classone_qwen9b_merged" `
   --repo-id "devops-thiago/classone-qwen3.5-9b" `
   --update-heads-only
 ```

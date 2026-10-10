@@ -18,7 +18,7 @@ Fine-tuning `Qwen/Qwen3.5-9B` in 4-bit NF4 precision with LoRA ($r=16, \alpha=32
 ---
 
 ## 3. Training & Evaluation Pipeline
-1. **Curriculum:** 23,503-sample Champion corpus (`data/champion_70pct_final_corpus.jsonl`).
+1. **Curriculum:** 23,503-sample balanced curriculum corpus (`data/composite_70pct_corpus.jsonl`).
 2. **Distributed Training:** Dual-GPU shared-memory IPC, linear warmup, cosine decay.
 3. **Benchmarks:** 231 JevBench public tasks and 100 RLCDAlignBench instances.
 

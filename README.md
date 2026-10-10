@@ -163,14 +163,14 @@ python scripts/benchmark_docker_cpu.py --url http://localhost:8000 --concurrency
 Evaluates chance-corrected Intelligence (equal type weighting across Choice, Noul, Score), multi-bin Expected Calibration Error, Speed (logarithmic latency scoring), and Cost (tariff per 1,000 decisions):
 
 ```bash
-# Evaluate Qwen 3.5 9B Champion locally on GPU:
+# Evaluate Qwen 3.5 9B locally on GPU:
 python scripts/eval_jevbench_v16.py --mode local
 
 # Evaluate against live HTTP API endpoint:
 python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Official JevBench v1.6.1 Scorecard (ClassOne Qwen 3.5 9B Champion):**
+**Official JevBench v1.6.1 Scorecard (ClassOne Qwen 3.5 9B):**
 
 | Axis | Weight | Score (0–100) | Metric Details |
 | :--- | :---: | :---: | :--- |
@@ -190,14 +190,14 @@ python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/
 Evaluates decision quality across all 5 canonical capability domains and generates official submission manifests (`scores.json` and `index.json`):
 
 ```bash
-# Evaluate Qwen 3.5 9B Champion locally on GPU:
+# Evaluate Qwen 3.5 9B locally on GPU:
 python scripts/eval_decision_index.py --mode local
 
 # Evaluate against live HTTP API endpoint:
 python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Official Decision Index Results (ClassOne Qwen 3.5 9B Champion):**
+**Official Decision Index Results (ClassOne Qwen 3.5 9B):**
 
 | Capability Domain | Official Weight | Domain Score | Raw Accuracy |
 | :--- | :---: | :---: | :---: |

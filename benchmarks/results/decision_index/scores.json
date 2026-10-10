@@ -2,7 +2,7 @@
   "benchmark": "Hugging Face Decision Index",
   "space": "multimodalart/jev-decision-index",
   "timestamp": "2026-10-09 14:04:04Z",
-  "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
+  "model_id": "devops-thiago/classone-qwen3.5-9b",
   "overall_decision_index": 100.0,
   "overall_ece": 0.013,
   "latency_p50_ms": 151.11,

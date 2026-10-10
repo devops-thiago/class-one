@@ -45,7 +45,7 @@ Empirically verified on hardware (`cuda:0`, NVIDIA GeForce RTX 5060 Ti):
 
 ## 4. Training Pipeline & Curriculum Inheritance
 
-The E4B training pipeline inherits our balanced 15-domain Champion corpus (`data/champion_70pct_final_corpus.jsonl`, 23,503 items):
+The E4B training pipeline inherits our balanced 15-domain curriculum corpus (`data/composite_70pct_corpus.jsonl`, 23,503 items):
 1. **Multi-Level Ordinal Rubrics:** 4-level and 5-level rubrics (`SEV-1`–`SEV-4`, bursary award tiers 0–4).
 2. **Missing Evidence & Ambiguity:** Supervised `cannot_determine` / `insufficient_information`.
 3. **Multi-Clause Settlements:** ContractNLI, CUAD covenants, insurance endorsement sublimits, and trade compliance (ECCN).

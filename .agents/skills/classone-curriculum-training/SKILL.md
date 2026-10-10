@@ -85,7 +85,7 @@ $env:PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 .venv\Scripts\python.exe scripts/train_rlcd.py `
   --base-model "devops-thiago/classone-qwen3.5-9b" `
   --pretrained-heads "checkpoints/snapshots/qwen9b_top3_candidate/classone_heads.pt" `
-  --dataset-path "data/curriculum/champion_70pct_corpus.jsonl" `
+  --dataset-path "data/composite_70pct_corpus.jsonl" `
   --batch-size 2 `
   --gradient-accumulation-steps 4 `
   --lr 1e-4 `

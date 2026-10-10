@@ -68,7 +68,7 @@ ITEMS = [
     {
         "item_id": "devops-thiago/classone-qwen3.5-9b",
         "item_type": "model",
-        "note": "ClassOne Qwen 3.5 9B System 1 Decision Model (80.1% JevBench Champion Milestone)",
+        "note": "ClassOne Qwen 3.5 9B System 1 Decision Model (73.28 JevBench Composite Milestone)",
     },
     {
         "item_id": "devops-thiago/classone-system-one-curriculum",

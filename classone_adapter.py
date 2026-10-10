@@ -74,18 +74,12 @@ class ClassOneAdapter:
         price_output_per_m: float = 0.0,
         timeout_s: float = 60.0,
     ):
-        # Default champion model path
-        default_model = "worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged"
-        if not os.path.exists(default_model):
-            default_model = "devops-thiago/classone-qwen3.5-9b"
+        # Default model path
+        default_model = os.environ.get("CLASSONE_MODEL", "devops-thiago/classone-qwen3.5-9b")
+        default_heads = os.environ.get("CLASSONE_HEADS", None)
 
-        # Default calibrated candidate heads
-        default_heads = "checkpoints/qwen9b_top3_candidate/classone_heads.pt"
-        if not os.path.exists(default_heads):
-            default_heads = os.path.join(default_model, "classone_heads.pt")
-
-        self.model_path = model_path or os.environ.get("CLASSONE_MODEL", default_model)
-        self.heads_path = heads_path or os.environ.get("CLASSONE_HEADS", default_heads)
+        self.model_path = model_path or default_model
+        self.heads_path = heads_path or default_heads or os.path.join(self.model_path, "classone_heads.pt")
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.quantization = quantization
         self.pause_tokens = pause_tokens

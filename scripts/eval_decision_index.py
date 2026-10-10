@@ -285,13 +285,13 @@ def main():
     parser.add_argument("--endpoint", default="http://127.0.0.1:8000/v1/decide", help="API endpoint URL")
     parser.add_argument(
         "--model-path",
-        default="worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged",
-        help="Local model weights",
+        default=os.environ.get("CLASSONE_MODEL", "devops-thiago/classone-qwen3.5-9b"),
+        help="Model checkpoint path or Hugging Face repo ID",
     )
     parser.add_argument(
         "--heads-path",
-        default="worktrees/qwen-3.5-9b/checkpoints/classone_qwen9b_champion_merged/classone_heads.pt",
-        help="Decision heads file",
+        default=None,
+        help="Decision heads file (optional, defaults to classone_heads.pt inside model path)",
     )
     parser.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device")
     parser.add_argument("--quant", default="4bit", help="Backbone quantization")
@@ -352,7 +352,7 @@ def main():
         "benchmark": "Hugging Face Decision Index",
         "space": "multimodalart/jev-decision-index",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
-        "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
+        "model_id": "devops-thiago/classone-qwen3.5-9b",
         "overall_decision_index": round(weighted_score, 2),
         "overall_ece": round(overall_ece, 4),
         "latency_p50_ms": round(p50_ms, 2),
@@ -374,8 +374,8 @@ def main():
 
     # 2. index.json (Submission manifest metadata)
     index_artifact = {
-        "model_name": "ClassOne System 1 Decision Engine (Qwen 3.5 9B Champion)",
-        "model_id": "devops-thiago/classone-qwen3.5-9b-champion",
+        "model_name": "ClassOne System 1 Decision Engine (Qwen 3.5 9B)",
+        "model_id": "devops-thiago/classone-qwen3.5-9b",
         "architecture": "Qwen 3.5 9B Backbone + Bilinear Decision Heads",
         "parameters": "9.2B",
         "quantization": "4bit NF4 / BF16",
