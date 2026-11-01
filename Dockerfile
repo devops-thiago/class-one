@@ -1,5 +1,5 @@
 # Production Dockerfile for ClassOne System 1 Service
-FROM python:3.11-slim
+FROM python:3.15-slim
 
 # Security: Create non-root system user and group
 RUN groupadd -r appgroup && useradd -r -g appgroup -u 1001 -m -d /home/appuser appuser
