@@ -125,8 +125,10 @@ class LocalEvaluator:
         print(f"[*] Loading local ClassOne model from {model_path} on {device} (pause_tokens={pause_tokens})...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.builder = ClassOnePromptBuilder(self.tokenizer, default_pause_tokens=pause_tokens)
-        is_large = any(k in model_path.lower() for k in ["9b", "12b", "e4b", "4b"]) or quant is not None
-        if quant is None and is_large:
+        is_large = any(k in model_path.lower() for k in ["9b", "12b", "e4b", "4b"])
+        if str(quant).lower() in ("none", "false", "no", "bf16", "fp16"):
+            quant = None
+        elif quant is None and is_large:
             quant = "4bit"
         self.model = ClassOneModel.from_backbone(
             base_model_name_or_path=model_path,
@@ -135,6 +137,12 @@ class LocalEvaluator:
             torch_dtype=torch.bfloat16 if is_large else torch.float16,
             quantization=quant,
         )
+        lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
+        if os.path.exists(lora_dir):
+            from peft import PeftModel
+            print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
+            self.model.backbone = PeftModel.from_pretrained(self.model.backbone, lora_dir)
+
         heads = torch.load(heads_path, map_location=device)
         self.model.noul_head.load_state_dict(heads["noul_head"], strict=False)
         self.model.choice_head.load_state_dict(heads["choice_head"], strict=False)

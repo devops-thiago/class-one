@@ -5,18 +5,18 @@
   "parameters": "9.2B",
   "quantization": "4bit NF4 / BF16",
   "license": "apache-2.0",
-  "submission_date": "2026-10-09",
+  "submission_date": "2026-10-16",
   "hardware_environment": "2x NVIDIA RTX 5060 Ti 16GB",
-  "overall_index": 100.0,
+  "overall_index": 97.16,
   "domain_scores": {
     "knowledge": 100.0,
     "language": 100.0,
     "retrieval": 100.0,
-    "tools": 100.0,
-    "rubric": 100.0
+    "tools": 90.0,
+    "rubric": 90.0
   },
   "metrics": {
-    "ece": 0.013,
-    "latency_p50_ms": 151.11
+    "ece": 0.0312,
+    "latency_p50_ms": 137.29
   }
 }

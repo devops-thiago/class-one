@@ -17,7 +17,7 @@ This skill provides the standard procedures and automated tools for evaluating C
 
 ## The ClassOne Benchmark Triad
 
-Every ClassOne model candidate must be evaluated and verified across three complementary suites:
+Every ClassOne model candidate must be evaluated and verified across four complementary suites:
 
 1. **JevBench Public Multi-Tier Benchmark (231 tasks)**:
    - **Easy Tier (48 tasks)**: Policy classification and basic refusal (`noul` + `choice`). Target: **100%**.
@@ -31,6 +31,14 @@ Every ClassOne model candidate must be evaluated and verified across three compl
    - Evaluates: Refusal, Sycophancy, Faithfulness, Privacy, Concealing Uncertainty, Reward Hacking, Power Seeking, Honesty (Deception), Bias, Prompt Injection.
    - Evaluates battery module strategies and inverts risk polarity for `deceptionbench_reward` (`risk = 1.0 - risk`).
    - Measures AUROC and Balanced Accuracy.
+4. **NVIDIA When2Call Tool Routing (3,652 MCQ instances)**:
+   - Evaluates action routing: `direct`, `tool_call`, `request_for_info`, and `cannot_answer`.
+   - Evaluates single-pass tool invocation gating vs. token generation decode.
+   - Runner: `scripts/eval_when2call.py --model <repo_id>`.
+5. **Prompt Injection & Security Gating (deepset/prompt-injections)**:
+   - Evaluates fast single-pass binary triage (`NoulQuestion`) on adversarial injections and jailbreaks.
+   - Measures AUROC, Benign Specificity, and Injection Recall.
+   - Runner: `scripts/eval_prompt_injection.py --model <repo_id>`.
 
 ---
 
@@ -119,6 +127,8 @@ When evaluating 9B, 4B, and E4B sequentially on 16 GB RTX 5060 Ti GPUs:
 
 | Model | JevBench Overall | JevBench Easy | JevBench Orig | JevBench Hard | Decision Index | RLCDAlignBench BalAcc | Candidate Head SHA256 |
 |---|---|---|---|---|---|---|---|
-| **Qwen 3.5 9B** | **78.4% (73.28 Comp)** | **100.0%** | **98.6%** | **55.9%** | **100%** | **62.9% (0.629 AUROC)** | `e1f67a8c...` |
-| **Qwen 3.5 4B** | **73.6%** | **100.0%** | **95.8%** | **47.7%** | **98%** | **55.3% (0.569 AUROC)** | `38c30a10...` |
-| **Gemma 4 E4B** | **71.0%** | **100.0%** | **94.4%** | **43.2%** | **96%** | **56.8% (0.560 AUROC)** | `58cbeeac...` |
+| **devops-thiago/classone-qwen3.5-9b** | **80.1% (185/231)** | **100.0%** | **98.6%** | **61.3%** | **100.0%** | **62.9% (0.629 AUROC)** | `e1f67a8c...` |
+| **devops-thiago/classone-qwen3.5-4b** | **75.8% (175/231)** | **100.0%** | **95.8%** | **52.3%** | **98.99%** | **55.3% (0.569 AUROC)** | `d040fd3e...` |
+| **devops-thiago/classone-gemma4-e4b** | **72.7% (168/231)** | **100.0%** | **95.8%** | **46.0%** | **97.16%** | **56.8% (0.560 AUROC)** | `42f9bb62...` |
+| **devops-thiago/classone-qwen3.5-2b** | **69.7% (161/231)** | **100.0%** | **93.1%** | **41.4%** | **96.41%** | **54.1% (0.540 AUROC)** | `bd24d863...` |
+| **devops-thiago/classone-gemma4-e2b** | **68.4% (158/231)** | **97.9%** | **90.3%** | **41.4%** | **95.80%** | **56.2% (0.562 AUROC)** | `3cb3a3fc...` |

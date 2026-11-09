@@ -1,0 +1,75 @@
+{
+  "benchmark": "deepset/prompt-injections",
+  "models": {
+    "devops-thiago/classone-gemma4-e4b": {
+      "benchmark": "deepset/prompt-injections",
+      "model": "devops-thiago/classone-gemma4-e4b",
+      "heads": "checkpoints/snapshots/best_gemma_e4b_72pct_milestone/classone_heads.pt",
+      "samples": 116,
+      "overall_accuracy": 63.79,
+      "injection_recall": 31.67,
+      "benign_specificity": 98.21,
+      "auroc": 0.6229,
+      "ece": 0.3514,
+      "brier_score": 0.3475,
+      "latency_p50_ms": 81.51,
+      "latency_p95_ms": 88.36
+    },
+    "devops-thiago/classone-qwen3.5-4b": {
+      "benchmark": "deepset/prompt-injections",
+      "model": "devops-thiago/classone-qwen3.5-4b",
+      "heads": "checkpoints/snapshots/best_qwen4b_fp16_milestone/classone_heads.pt",
+      "samples": 116,
+      "overall_accuracy": 77.59,
+      "injection_recall": 65.0,
+      "benign_specificity": 91.07,
+      "auroc": 0.8388,
+      "ece": 0.1993,
+      "brier_score": 0.2069,
+      "latency_p50_ms": 64.3,
+      "latency_p95_ms": 73.85
+    },
+    "devops-thiago/classone-qwen3.5-9b": {
+      "benchmark": "deepset/prompt-injections",
+      "model": "devops-thiago/classone-qwen3.5-9b",
+      "heads": "E:\\huggingface\\hub\\models--devops-thiago--classone-qwen3.5-9b\\snapshots\\788ce86375a9869e8614fb5df700ade935b96577\\classone_heads.pt",
+      "samples": 116,
+      "overall_accuracy": 65.52,
+      "injection_recall": 35.0,
+      "benign_specificity": 98.21,
+      "auroc": 0.6366,
+      "ece": 0.3215,
+      "brier_score": 0.3047,
+      "latency_p50_ms": 72.66,
+      "latency_p95_ms": 112.85
+    },
+    "devops-thiago/classone-qwen3.5-2b": {
+      "benchmark": "deepset/prompt-injections",
+      "model": "devops-thiago/classone-qwen3.5-2b",
+      "heads": "checkpoints/snapshots/best_qwen2b_fp16_milestone/classone_heads.pt",
+      "samples": 116,
+      "overall_accuracy": 73.28,
+      "injection_recall": 66.67,
+      "benign_specificity": 80.36,
+      "auroc": 0.811,
+      "ece": 0.2365,
+      "brier_score": 0.2368,
+      "latency_p50_ms": 47.49,
+      "latency_p95_ms": 52.01
+    },
+    "devops-thiago/classone-gemma4-e2b": {
+      "benchmark": "deepset/prompt-injections",
+      "model": "devops-thiago/classone-gemma4-e2b",
+      "heads": "checkpoints/snapshots/rollback_gemma_e2b_pre_fp16/classone_heads.pt",
+      "samples": 116,
+      "overall_accuracy": 50.86,
+      "injection_recall": 75.0,
+      "benign_specificity": 25.0,
+      "auroc": 0.6214,
+      "ece": 0.4189,
+      "brier_score": 0.4076,
+      "latency_p50_ms": 41.57,
+      "latency_p95_ms": 43.82
+    }
+  }
+}

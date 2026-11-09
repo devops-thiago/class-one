@@ -180,17 +180,20 @@ def main():
     model_path = sys.argv[1] if len(sys.argv) > 1 else "checkpoints/classone_gemma4_e2b_merged"
     heads_path = sys.argv[2] if len(sys.argv) > 2 else "checkpoints/classone_gemma4_e2b/classone_heads.pt"
 
-    if not os.path.exists(model_path):
+    if not os.path.exists(model_path) and "/" not in model_path:
         model_path = REPO_ID
-    if not os.path.exists(heads_path):
+    if not os.path.exists(heads_path) and "/" in heads_path:
+        heads_path = hf_hub_download(heads_path, "classone_heads.pt")
+    elif not os.path.exists(heads_path):
         heads_path = hf_hub_download(REPO_ID, "classone_heads.pt")
 
     print(f"[*] Loading {model_path} on {device} (heads from {heads_path})...")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     builder = ClassOnePromptBuilder(tokenizer)
 
+    no_quant = "--no-quant" in sys.argv or "--unquantized" in sys.argv or "--fp16" in sys.argv or "--bf16" in sys.argv
     is_large = any(k in model_path.lower() for k in ["e4b", "12b", "9b", "4b"]) or "--4bit" in sys.argv
-    quant = "4bit" if is_large else None
+    quant = None if no_quant else ("4bit" if is_large else None)
 
     model = ClassOneModel.from_backbone(
         base_model_name_or_path=model_path,
@@ -199,6 +202,12 @@ def main():
         torch_dtype=torch.bfloat16 if is_large else torch.float16,
         quantization=quant,
     )
+    lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
+    if os.path.exists(lora_dir) and "--no-lora" not in sys.argv:
+        from peft import PeftModel
+        print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
+        model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
+
     heads = torch.load(heads_path, map_location=device)
     model.noul_head.load_state_dict(heads["noul_head"], strict=False)
     model.choice_head.load_state_dict(heads["choice_head"], strict=False)

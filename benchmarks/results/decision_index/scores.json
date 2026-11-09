@@ -1,12 +1,12 @@
 {
   "benchmark": "Hugging Face Decision Index",
   "space": "multimodalart/jev-decision-index",
-  "timestamp": "2026-10-09 14:04:04Z",
+  "timestamp": "2026-10-16 01:40:27Z",
   "model_id": "devops-thiago/classone-qwen3.5-9b",
-  "overall_decision_index": 100.0,
-  "overall_ece": 0.013,
-  "latency_p50_ms": 151.11,
-  "latency_p95_ms": 182.87,
+  "overall_decision_index": 97.16,
+  "overall_ece": 0.0312,
+  "latency_p50_ms": 137.29,
+  "latency_p95_ms": 146.46,
   "radar_metrics": {
     "knowledge": {
       "name": "Knowledge & Verification",
@@ -31,16 +31,16 @@
     },
     "tools": {
       "name": "Tools & Execution Guardrails",
-      "score": 100.0,
+      "score": 90.0,
       "weight": 0.183,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 90.0,
       "tasks": 10
     },
     "rubric": {
       "name": "Rubric & Quality Scoring",
-      "score": 100.0,
+      "score": 90.0,
       "weight": 0.101,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 90.0,
       "tasks": 10
     }
   }

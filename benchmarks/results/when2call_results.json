@@ -1,0 +1,35 @@
+{
+  "benchmark": "NVIDIA When2Call (mcq)",
+  "models": {
+    "devops-thiago/classone-gemma4-e4b": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "devops-thiago/classone-gemma4-e4b",
+      "sample_count": 50,
+      "overall_accuracy_pct": 12.0,
+      "ece": 0.5739,
+      "latency_p50_ms": 279.17,
+      "latency_p95_ms": 627.63,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 12.0
+      },
+      "per_class_counts": {
+        "cannot_answer": 50
+      }
+    },
+    "devops-thiago/classone-qwen3.5-4b": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "devops-thiago/classone-qwen3.5-4b",
+      "sample_count": 50,
+      "overall_accuracy_pct": 0.0,
+      "ece": 0.8776,
+      "latency_p50_ms": 254.09,
+      "latency_p95_ms": 620.29,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 0.0
+      },
+      "per_class_counts": {
+        "cannot_answer": 50
+      }
+    }
+  }
+}

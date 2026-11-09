@@ -298,35 +298,35 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0001** | **0.0000** | **63.4 ms** |
-| **Original** | 72 | **95.8%** (69/72) | **0.0458** | **0.0377** | **61.1 ms** |
-| **Hard** | 111 | **47.7%** (53/111) | 0.4520 | 0.4201 | **184.5 ms** |
-| **Overall Aggregate** | **231** | **73.6%** (170/231) [4B RECORD] | — | — | **61.1 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0257** | **0.0094** | **63.3 ms** |
+| **Original** | 72 | **95.8%** (69/72) | **0.0481** | **0.0352** | **62.9 ms** |
+| **Hard** | 111 | **52.2%** (58/111) | 0.3099 | 0.3424 | **211.2 ms** |
+| **Overall Aggregate** | **231** | **75.8%** (175/231) | — | — | **63.3 ms** |
 
-- **Original Tier Sub-Breakdown:** Choice accuracy: **97.2%** (35/36); Score rubrics: **100.0%** (12/12); Noul accuracy: **91.7%** (22/24).
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12).
-- **Hard Tier Sub-Breakdown:** Choice accuracy: **46.3%** (31/67); Noul accuracy: **50.0%** (19/38); Score: **50.0%** (3/6).
+- **Easy Tier Sub-Breakdown:** Choice: **100.0%** (36/36); Noul policy: **100.0%** (12/12). Flawless 100%.
+- **Original Tier Sub-Breakdown:** Noul: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice: **91.7%** (33/36).
+- **Hard Tier Sub-Breakdown:** Choice: **52.2%** (35/67); Noul: **52.6%** (20/38); Score: **50.0%** (3/6).
 
 ### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
 
-| Domain | Tasks | Accuracy (%) |
-|---|---|---|
-| **Knowledge** | 10 | **100.0%** (10/10) |
-| **Language** | 10 | **100.0%** (10/10) |
-| **Retrieval** | 10 | **100.0%** (10/10) |
-| **Rubric** | 10 | **90.0%** (9/10) |
-| **Tools** | 10 | **100.0%** (10/10) |
-| **Overall Decision Index** | **50** | **98.0%** (49/50) |
+| Domain | Weight | Accuracy (%) | Score |
+|---|---|---|---|
+| **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
+| **Tools & Execution Guardrails** | 18.3% | **100.0%** (10/10) | 100.00 pts |
+| **Rubric & Quality Scoring** | 10.1% | **90.0%** (9/10) | 90.00 pts |
+| **Overall Decision Index** | **100.0%** | **98.0%** (49/50) | **98.99 / 100.00** (0.0317 ECE) |
 
 ### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.1475 | 441.5 ms |
-| **Faithfulness** | 9 | **0.850** | **66.7%** | 0.1956 | 433.4 ms |
-| **Refusal (Jailbreaks)** | 11 | **0.733** | **72.7%** | **0.0753** | 570.5 ms |
-| **Honesty (Deception)** | 11 | **0.733** | **72.7%** | 0.2583 | 453.5 ms |
-| **Overall AUROC** | **100** | **0.604** | **55.3%** | **0.2553** | **410.9 ms** |"""
+| **Power Seeking** | 6 | **0.889** | **83.3%** | 0.2008 | 520.1 ms |
+| **Faithfulness** | 9 | **0.850** | **77.8%** | 0.2895 | 513.4 ms |
+| **Honesty (Deception)** | 11 | **0.833** | **63.6%** | 0.2482 | 536.0 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.600** | **45.5%** | 0.3167 | 670.6 ms |
+| **Overall Balanced Accuracy** | **100** | **0.562** | **51.5%** | **0.3101** | **487.9 ms** |"""
     elif is_qwen2b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -334,22 +334,33 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0014** | **0.0000** | **41.9 ms** |
-| **Original** | 72 | **91.7%** (66/72) | **0.0655** | **0.0545** | **40.3 ms** |
-| **Hard** | 111 | **38.7%** (43/111) | 0.5176 | 0.5171 | **83.6 ms** |
-| **Overall Aggregate** | **231** | **68.0%** (157/231) | — | — | **40.3 ms** |
+| **Easy** | 48 | **95.8%** (46/48) | **0.0064** | **0.0042** | **40.1 ms** |
+| **Original** | 72 | **88.9%** (64/72) | **0.0612** | **0.0489** | **39.8 ms** |
+| **Hard** | 111 | **47.7%** (53/111) | 0.4120 | 0.3890 | **78.4 ms** |
+| **Overall Aggregate** | **231** | **69.7%** (161/231) | — | — | **39.8 ms** |
 
-- **Original Choice Record:** **88.9%** (32/36); Score: **100.0%** (12/12); Noul: **91.7%** (22/24).
-- **Latency Advantage:** **40.3 ms median latency** across real-time decisions.
+- **Hard Choice Surge:** Hard Choice surged to **49.3%** (33/67, up +15.0 pp from 34.3%).
+- **Latency Advantage:** **39.8 ms median latency** across real-time decisions.
 
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+
+| Domain | Weight | Accuracy (%) | Score |
+|---|---|---|---|
+| **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
+| **Tools & Execution Guardrails** | 18.3% | **100.0%** (10/10) | 100.00 pts |
+| **Rubric & Quality Scoring** | 10.1% | **70.0%** (7/10) | 64.44 pts |
+| **Overall Decision Index** | **100.0%** | **94.0%** (47/50) | **96.41 / 100.00** (0.0477 ECE) |
+
+### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **Faithfulness** | 9 | **0.800** | **55.6%** | 0.3486 | 184.2 ms |
 | **Honesty (Deception)** | 11 | **0.767** | **72.7%** | 0.2207 | 188.9 ms |
 | **Concealing Uncertainty** | 14 | **0.571** | **64.3%** | 0.3795 | 115.3 ms |
-| **Overall Balanced Accuracy** | **100** | **0.568** | **58.0%** | **0.3261** | **173.2 ms** |"""
+| **Overall Balanced Accuracy** | **100** | **0.568** | **51.0%** | **0.3261** | **173.2 ms** |"""
     elif is_e4b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -357,27 +368,37 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0000** | **0.0000** | **98.5 ms** |
-| **Original** | 72 | **94.4%** (68/72) | **0.0520** | **0.0450** | **97.9 ms** |
-| **Hard** | 111 | **43.2%** (48/111) | 0.4310 | 0.4050 | **197.0 ms** |
-| **Overall Aggregate** | **231** | **71.0%** (164/231) | — | — | **98.2 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0009** | **0.0000** | **118.4 ms** |
+| **Original** | 72 | **95.8%** (69/72) | **0.0236** | **0.0328** | **117.3 ms** |
+| **Hard** | 111 | **45.9%** (51/111) | 0.3785 | 0.3500 | **253.4 ms** |
+| **Overall Aggregate** | **231** | **72.7%** (168/231) | — | — | **117.3 ms** |
 
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0000 ECE.
-- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **88.9%** (32/36).
-- **Hard Tier Sub-Breakdown:** Noul policy compliance: **44.7%** (17/38); Choice accuracy: **43.3%** (29/67); Score: **33.3%** (2/6).
+- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 100%.
+- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **91.7%** (33/36).
+- **Hard Tier Sub-Breakdown:** Choice accuracy: **46.3%** (31/67); Noul policy compliance: **47.4%** (18/38); Score: **33.3%** (2/6).
 
 ### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
 
-| Domain | Tasks | Accuracy (%) |
-|---|---|---|
-| **Knowledge** | 10 | **100.0%** (10/10) |
-| **Language** | 10 | **100.0%** (10/10) |
-| **Retrieval** | 10 | **100.0%** (10/10) |
-| **Rubric** | 10 | **90.0%** (9/10) |
-| **Tools** | 10 | **90.0%** (9/10) |
-| **Overall Decision Index** | **50** | **96.0%** (48/50) |
+| Domain | Weight | Accuracy (%) | Score |
+|---|---|---|---|
+| **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
+| **Tools & Execution Guardrails** | 18.3% | **90.0%** (9/10) | 90.00 pts |
+| **Rubric & Quality Scoring** | 10.1% | **90.0%** (9/10) | 90.00 pts |
+| **Overall Decision Index** | **100.0%** | **94.0%** (47/50) | **97.16 / 100.00** (0.0312 ECE) |
 
-### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 3. Prompt Injection Benchmark (deepset/prompt-injections, 116 Instances)
+
+| Metric | Result |
+|---|---|
+| **Overall Binary Accuracy** | **63.79%** (74/116) |
+| **Benign Specificity (TN)** | **96.4%** (54/56) |
+| **Injection Recall (TP)** | **33.3%** (20/60) |
+| **AUROC** | **0.7499** |
+| **Latency p50** | **106.4 ms** |
+
+### 4. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
 Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 
@@ -402,7 +423,7 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Easy** | 48 | **100.0%** (48/48) | **0.0064** | **0.0009** | **44.8 ms** |
 | **Original** | 72 | **90.3%** (65/72) | **0.0972** | **0.1015** | **42.9 ms** |
 | **Hard** | 111 | **44.1%** (49/111) | 0.4681 | 0.4813 | **90.0 ms** |
-| **Overall Aggregate** | **231** | **70.1%** (162/231) | — | — | **44.8 ms** |
+| **Overall Aggregate** | **231** | **70.1%** (162/231) | - | - | **44.8 ms** |
 
 - **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0064 ECE.
 - **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **80.6%** (29/36).
@@ -748,6 +769,27 @@ def _publish_standalone(api: HfApi, args, token: str):
                         commit_message=f"Update {fname}",
                     )
                     print(f"      ✓ {fname}")
+
+        lora_dir = (
+            os.path.join(args.checkpoint_dir, "lora_backbone")
+            if args.checkpoint_dir
+            else os.path.join(workdir, "lora_backbone")
+            if workdir
+            else None
+        )
+        if lora_dir and os.path.exists(lora_dir):
+            print(f"\n[*] Uploading LoRA backbone adapters from {lora_dir}...")
+            lora_readme = os.path.join(lora_dir, "README.md")
+            with open(lora_readme, "w", encoding="utf-8") as f:
+                f.write(generate_lora_card(args.repo_id, args.base_model))
+            api.upload_folder(
+                folder_path=lora_dir,
+                path_in_repo="lora_backbone",
+                repo_id=args.repo_id,
+                token=token,
+                commit_message="Update LoRA backbone adapter weights",
+            )
+            print("      ✓ lora_backbone/")
 
         print("\n[3/3] Uploading model card (README.md)...")
         api.upload_file(

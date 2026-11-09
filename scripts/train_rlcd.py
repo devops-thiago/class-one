@@ -172,6 +172,10 @@ def parse_args():
 
 def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None):
     """Worker function executed per GPU."""
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
     is_main_process = rank == 0
 
     if world_size > 1:
