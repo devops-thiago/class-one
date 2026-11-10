@@ -97,6 +97,7 @@ def load_model(device: str = "cuda:0", model_path: str = REPO_ID, heads_path: st
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
         if os.path.exists(lora_dir):
             from peft import PeftModel
+
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
 

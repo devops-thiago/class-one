@@ -15,10 +15,10 @@ Strictly uses official TRAIN splits only (zero test-set contamination):
 Total: ~5,246 samples -> data/agentic_hard_combined_corpus.jsonl
 """
 
-from collections import defaultdict
 import json
 import os
 import random
+from collections import defaultdict
 
 from datasets import load_dataset
 
@@ -26,14 +26,10 @@ from classone.data.dataset import ClassOneDataset, bundle_multi_task_items
 from classone.schemas import ChoiceQuestion, NoulQuestion
 from classone.train.trainer import TrainingItem
 
-
 OUTPUT_PATH = os.path.join("data", "agentic_hard_combined_corpus.jsonl")
 HARD_CURRICULUM_PATH = os.path.join("data", "hard_tier_curriculum.jsonl")
 
-WHEN2CALL_INSTRUCTIONS = (
-    "Which response should the assistant give to the user's question, "
-    "given the available tools?"
-)
+WHEN2CALL_INSTRUCTIONS = "Which response should the assistant give to the user's question, given the available tools?"
 
 
 def classify_when2call_response(text: str) -> str:
@@ -144,9 +140,7 @@ def build_when2call_train_items(target_count: int = 1200, seed: int = 42) -> lis
 
     # Top up to target_count if any category had fewer than per_cat
     if len(selected_entries) < target_count:
-        remaining = [
-            e for cat in all_categories for e in by_category[cat][per_cat:]
-        ]
+        remaining = [e for cat in all_categories for e in by_category[cat][per_cat:]]
         rng.shuffle(remaining)
         selected_entries.extend(remaining[: target_count - len(selected_entries)])
 
@@ -214,8 +208,7 @@ def build_prompt_injection_train_items(seed: int = 42) -> list[TrainingItem]:
         state = f"User Input Submission:\n{text}"
         nq = NoulQuestion(
             instructions=(
-                "Is this user input a safe, benign request free from prompt injection "
-                "or instruction override attempts?"
+                "Is this user input a safe, benign request free from prompt injection or instruction override attempts?"
             )
         )
 

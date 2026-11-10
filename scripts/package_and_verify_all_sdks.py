@@ -285,9 +285,17 @@ def main() -> None:
         ("Java (Maven Central)", "maven-gpg-plugin" in pom_text, "GPG Sign Plugin configured in pom.xml"),
         ("Ruby (RubyGems)", "s.signing_key" in gemspec_text, "X.509 Cryptographic Gem Signing configured in gemspec"),
         ("Node.js (npm)", "--provenance" in sdk_workflow, "Sigstore Provenance & Detached GPG in release workflow"),
-        ("Rust (crates.io)", "attest-build-provenance" in sdk_workflow, "Sigstore Attestation & GPG Sign in release workflow"),
+        (
+            "Rust (crates.io)",
+            "attest-build-provenance" in sdk_workflow,
+            "Sigstore Attestation & GPG Sign in release workflow",
+        ),
         ("Go (pkg.go.dev)", "git tag -s" in sdk_workflow, "GPG Signed Git Tag configured in release workflow"),
-        ("Python (PyPI)", "attest-build-provenance" in py_workflow, "Sigstore Attestation & GPG Sign in release workflow"),
+        (
+            "Python (PyPI)",
+            "attest-build-provenance" in py_workflow,
+            "Sigstore Attestation & GPG Sign in release workflow",
+        ),
     ]
 
     all_signed = True

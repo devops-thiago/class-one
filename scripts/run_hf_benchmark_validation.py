@@ -24,8 +24,8 @@ from huggingface_hub import hf_hub_download
 from transformers import AutoTokenizer
 
 from classone.modeling.modeling_classone import ClassOneModel
-from classone.tokenizer import ClassOnePromptBuilder
 from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from classone.tokenizer import ClassOnePromptBuilder
 
 
 def get_hf_token() -> str | None:
@@ -41,6 +41,7 @@ def get_hf_token() -> str | None:
 
 def sha256_file(path: str) -> str:
     import hashlib
+
     with open(path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
 
@@ -69,7 +70,7 @@ def evaluate_jevbench(model, builder, pause_tokens: int = 8) -> dict[str, Any]:
     print("\n--- Evaluating JevBench Public Multi-Tier Benchmark (231 Tasks) ---")
     for tier_name, tier_path in tiers:
         tasks = []
-        with open(tier_path, "r", encoding="utf-8") as f:
+        with open(tier_path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     tasks.append(json.loads(line.strip()))
@@ -90,7 +91,9 @@ def evaluate_jevbench(model, builder, pause_tokens: int = 8) -> dict[str, Any]:
             elif q_type == "choice":
                 raw_crit = q_data.get("criteria", {})
                 if isinstance(raw_crit, dict):
-                    crit = {str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v)) for k, v in raw_crit.items()}
+                    crit = {
+                        str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v)) for k, v in raw_crit.items()
+                    }
                 elif isinstance(raw_crit, list):
                     crit = {str(i): str(c) for i, c in enumerate(raw_crit)}
                 else:
@@ -136,7 +139,12 @@ def evaluate_jevbench(model, builder, pause_tokens: int = 8) -> dict[str, Any]:
 
     overall_acc = (total_correct / total_tasks) * 100.0
     print(f"  [OVERALL ] {total_correct:3d}/{total_tasks:3d} correct ({overall_acc:5.1f}%)")
-    return {"overall_accuracy": overall_acc, "total_correct": total_correct, "total_tasks": total_tasks, "tiers": tier_results}
+    return {
+        "overall_accuracy": overall_acc,
+        "total_correct": total_correct,
+        "total_tasks": total_tasks,
+        "tiers": tier_results,
+    }
 
 
 def evaluate_decision_index(model, builder, pause_tokens: int = 8) -> dict[str, Any]:
@@ -151,7 +159,7 @@ def evaluate_decision_index(model, builder, pause_tokens: int = 8) -> dict[str, 
             continue
         domain = filename.replace(".jsonl", "")
         tasks = []
-        with open(os.path.join(di_dir, filename), "r", encoding="utf-8") as f:
+        with open(os.path.join(di_dir, filename), encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     tasks.append(json.loads(line.strip()))
@@ -197,7 +205,12 @@ def evaluate_decision_index(model, builder, pause_tokens: int = 8) -> dict[str, 
 
     overall_di = (total_correct / total_tasks) * 100.0
     print(f"  [OVERALL DI ] {total_correct:2d}/{total_tasks:2d} ({overall_di:5.1f}%)")
-    return {"overall_decision_index": overall_di, "total_correct": total_correct, "total_tasks": total_tasks, "domains": di_results}
+    return {
+        "overall_decision_index": overall_di,
+        "total_correct": total_correct,
+        "total_tasks": total_tasks,
+        "domains": di_results,
+    }
 
 
 def evaluate_rlcd_alignbench(model, builder, pause_tokens: int = 8) -> dict[str, Any]:
@@ -275,8 +288,8 @@ def evaluate_rlcd_alignbench(model, builder, pause_tokens: int = 8) -> dict[str,
     preds = (y_score_arr >= 0.5).astype(int)
 
     # Balanced accuracy: mean of sensitivity and specificity
-    pos_mask = (y_true_arr == 1)
-    neg_mask = (y_true_arr == 0)
+    pos_mask = y_true_arr == 1
+    neg_mask = y_true_arr == 0
     sens = np.mean(preds[pos_mask] == 1) if np.sum(pos_mask) > 0 else 0.0
     spec = np.mean(preds[neg_mask] == 0) if np.sum(neg_mask) > 0 else 0.0
     balanced_acc = (sens + spec) / 2.0 * 100.0
@@ -298,7 +311,9 @@ def evaluate_rlcd_alignbench(model, builder, pause_tokens: int = 8) -> dict[str,
 
 def main():
     parser = argparse.ArgumentParser(description="Validate fresh HF published models")
-    parser.add_argument("--repo-id", type=str, required=True, help="HF Repo ID (e.g. devops-thiago/classone-qwen3.5-9b)")
+    parser.add_argument(
+        "--repo-id", type=str, required=True, help="HF Repo ID (e.g. devops-thiago/classone-qwen3.5-9b)"
+    )
     parser.add_argument("--expected-head-sha", type=str, required=True, help="Expected SHA256 of classone_heads.pt")
     parser.add_argument("--include-alignbench", action="store_true", help="Run RLCDAlignBench evaluation")
     parser.add_argument("--device", type=str, default="cuda:0")
@@ -371,10 +386,14 @@ def main():
     print(f"VALIDATION SUMMARY FOR {args.repo_id}")
     print("=" * 80)
     print(f"Head SHA256:           {actual_sha} [MATCHED]")
-    print(f"JevBench Overall:      {results['jevbench']['overall_accuracy']:.1f}% ({results['jevbench']['total_correct']}/{results['jevbench']['total_tasks']}) in {jev_time:.1f}s")
-    for tier, tr in results['jevbench']['tiers'].items():
+    print(
+        f"JevBench Overall:      {results['jevbench']['overall_accuracy']:.1f}% ({results['jevbench']['total_correct']}/{results['jevbench']['total_tasks']}) in {jev_time:.1f}s"
+    )
+    for tier, tr in results["jevbench"]["tiers"].items():
         print(f"  - {tier.capitalize():8s} Tier: {tr['accuracy']:.1f}% ({tr['correct']}/{tr['total']})")
-    print(f"HF Decision Index:     {results['decision_index']['overall_decision_index']:.1f}% ({results['decision_index']['total_correct']}/{results['decision_index']['total_tasks']}) in {di_time:.1f}s")
+    print(
+        f"HF Decision Index:     {results['decision_index']['overall_decision_index']:.1f}% ({results['decision_index']['total_correct']}/{results['decision_index']['total_tasks']}) in {di_time:.1f}s"
+    )
     if args.include_alignbench:
         print(f"RLCDAlignBench AUROC:  {results['rlcd_alignbench']['overall_auroc']:.3f}")
         print(f"RLCDAlignBench BalAcc: {results['rlcd_alignbench']['balanced_accuracy']:.1f}% in {align_time:.1f}s")

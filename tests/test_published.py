@@ -30,11 +30,14 @@ def test_pypi_package_exports():
 
 
 def test_published_tokenizer_and_special_tokens():
-    """Verifies that the published tokenizer loads from HF Hub and has ClassOne special tokens."""
+    """Verifies that the published tokenizer loads from HF Hub and maps all ClassOne special tokens."""
     tokenizer = AutoTokenizer.from_pretrained(HF_REPO_ID)
+    builder = ClassOnePromptBuilder(tokenizer)
     vocab = tokenizer.get_vocab()
     for tok in SPECIAL_TOKENS:
-        assert tok in vocab, f"Missing special token {tok} in published tokenizer"
+        mapped_tok = builder.delimiter_map[tok]
+        assert mapped_tok in vocab, f"Missing mapped special token {mapped_tok} ({tok}) in published tokenizer"
+        assert builder.special_token_ids[tok] != getattr(tokenizer, "unk_token_id", -1)
 
 
 def test_published_heads_structure():

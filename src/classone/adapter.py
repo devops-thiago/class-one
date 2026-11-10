@@ -12,4 +12,3 @@ except ImportError:
     from classone_adapter import ClassOneAdapter, DecisionResult
 
 __all__ = ["ClassOneAdapter", "DecisionResult"]
-

@@ -21,8 +21,6 @@ import os
 import random
 from typing import Any
 
-from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
-
 
 def random_date(start_year: int = 2024, end_year: int = 2026) -> datetime.date:
     start = datetime.date(start_year, 1, 1)
@@ -61,23 +59,22 @@ def partition_amount(total: int, n: int, min_val: int = 1000, max_val: int = 950
 # ==============================================================================
 def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]:
     items = []
-    
+
     # Mode A: 90-Day Anti-Splitting Procurement Rule (400 samples)
     vendors = ["Apex Cloud Logistics", "BioHealth Dynamics", "CyberShield Labs", "DataVertex AI", "EchoFleet Systems"]
     departments = ["Engineering", "Infrastructure", "Clinical Research", "Supply Chain", "Corporate Security"]
-    
+
     for i in range(400):
         vendor = random.choice(vendors)
         dept = random.choice(departments)
         base_date = random_date(2025, 2025)
-        
+
         # Decide if this sequence violates anti-splitting (threshold $10,000 in 90 days)
-        is_violation = (i % 2 == 0)
-        
+        is_violation = i % 2 == 0
+
         num_orders = random.randint(2, 4)
         orders = []
-        running_date = base_date
-        
+
         if is_violation:
             # Total >= 10,000 within <= 90 days, each individual order < 10,000
             total_amount = random.randint(10500, 24000)
@@ -85,32 +82,38 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
             day_offsets = sorted(random.sample(range(5, 85), num_orders))
             for o_idx, amt in enumerate(split_amounts):
                 o_date = base_date + datetime.timedelta(days=day_offsets[o_idx])
-                orders.append({
-                    "po_number": f"PO-2025-{10000 + i * 10 + o_idx}",
-                    "date": o_date.isoformat(),
-                    "amount_usd": amt,
-                    "description": f"Deliverables batch #{o_idx + 1} for {vendor}"
-                })
+                orders.append(
+                    {
+                        "po_number": f"PO-2025-{10000 + i * 10 + o_idx}",
+                        "date": o_date.isoformat(),
+                        "amount_usd": amt,
+                        "description": f"Deliverables batch #{o_idx + 1} for {vendor}",
+                    }
+                )
         else:
             # Either total < 10,000 OR span > 90 days
             variant = random.choice(["under_threshold", "spread_out"])
             if variant == "under_threshold":
                 total_amount = random.randint(3000, 9500)
-                split_amounts = partition_amount(total_amount, num_orders, min_val=500, max_val=total_amount // num_orders + 1000)
+                split_amounts = partition_amount(
+                    total_amount, num_orders, min_val=500, max_val=total_amount // num_orders + 1000
+                )
                 day_offsets = sorted(random.sample(range(5, 85), num_orders))
             else:
                 total_amount = random.randint(11000, 22000)
                 split_amounts = [total_amount // num_orders] * num_orders
                 day_offsets = [0, 95, 195, 290][:num_orders]
-            
+
             for o_idx, amt in enumerate(split_amounts):
                 o_date = base_date + datetime.timedelta(days=day_offsets[o_idx])
-                orders.append({
-                    "po_number": f"PO-2025-{10000 + i * 10 + o_idx}",
-                    "date": o_date.isoformat(),
-                    "amount_usd": amt,
-                    "description": f"Standard scheduled intake #{o_idx + 1}"
-                })
+                orders.append(
+                    {
+                        "po_number": f"PO-2025-{10000 + i * 10 + o_idx}",
+                        "date": o_date.isoformat(),
+                        "amount_usd": amt,
+                        "description": f"Standard scheduled intake #{o_idx + 1}",
+                    }
+                )
 
         state = {
             "policy_context": (
@@ -125,20 +128,22 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
             "audit_window_start": base_date.isoformat(),
             "purchase_orders": orders,
         }
-        
+
         # Dual questions: 1 choice, 1 noul
         crit = {
             "compliant_under_threshold": "Cumulative commitments remain strictly below the $10,000 anti-splitting threshold within any rolling 90-day period.",
             "unauthorized_split_violation": "Cumulative orders to vendor exceed $10,000 within a rolling 90-day window without advance VP authorization.",
             "valid_periodic_orders_outside_window": "Cumulative orders exceed $10,000 but dates are separated by more than 90 calendar days between qualifying batches.",
-            "unrelated_vendor_exemption": "Orders involve completely distinct legal entities not subject to joint vendor consolidation."
+            "unrelated_vendor_exemption": "Orders involve completely distinct legal entities not subject to joint vendor consolidation.",
         }
-        
+
         if is_violation:
             target_choice = "unauthorized_split_violation"
             target_noul = 1.0
         else:
-            target_choice = "valid_periodic_orders_outside_window" if (variant == "spread_out") else "compliant_under_threshold"
+            target_choice = (
+                "valid_periodic_orders_outside_window" if (variant == "spread_out") else "compliant_under_threshold"
+            )
             target_noul = 0.0
 
         item = {
@@ -152,12 +157,12 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
                 "is_anti_splitting_violation": {
                     "type": "noul",
                     "instructions": "Does this purchase order sequence violate the 90-day anti-splitting procurement rule?",
-                }
+                },
             },
             "targets": {
                 "compliance_status": target_choice,
                 "is_anti_splitting_violation": target_noul,
-            }
+            },
         }
         items.append(item)
 
@@ -167,7 +172,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
         monthly_fee = random.choice([49.0, 99.0, 199.0, 499.0, 1200.0])
         cancel_day_offset = random.randint(5, 75)
         cancel_date = signup_date + datetime.timedelta(days=cancel_day_offset)
-        
+
         # Policy: 30-day money-back guarantee; between 31 and 60 days prorated credit only; >60 days no refund
         if cancel_day_offset <= 30:
             status = "full_refund_eligible"
@@ -178,7 +183,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
         else:
             status = "no_refund_or_credit"
             is_full_refund = 0.0
-            
+
         state = {
             "terms_of_service": (
                 "Billing Policy Section 3 (Subscription Cancellation Windows):\n"
@@ -196,7 +201,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
             "full_refund_eligible": "Cancellation submitted within initial 30 calendar days; entitled to 100% cash refund.",
             "prorated_credit_only": "Cancellation submitted between Day 31 and Day 60; entitled strictly to prorated account credit.",
             "no_refund_or_credit": "Cancellation submitted after Day 60; strictly no refund or account credit issued.",
-            "immediate_forfeiture_penalty": "Customer violated acceptable use policy resulting in immediate forfeiture of all balances."
+            "immediate_forfeiture_penalty": "Customer violated acceptable use policy resulting in immediate forfeiture of all balances.",
         }
         item = {
             "state": state,
@@ -209,12 +214,12 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
                 "is_full_cash_refund": {
                     "type": "noul",
                     "instructions": "Is the customer entitled to a 100% full cash refund under the cancellation terms?",
-                }
+                },
             },
             "targets": {
                 "billing_remedy": status,
                 "is_full_cash_refund": is_full_refund,
-            }
+            },
         }
         items.append(item)
 
@@ -224,10 +229,10 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
         renewal_date = effective_date + datetime.timedelta(days=365)
         # Required notice: 60 days before renewal
         deadline_date = renewal_date - datetime.timedelta(days=60)
-        
+
         notice_offset_from_deadline = random.randint(-40, 40)
         notice_date = deadline_date + datetime.timedelta(days=notice_offset_from_deadline)
-        
+
         # If notice sent on or before deadline, non-renewal is effective; otherwise automatically renews
         if notice_date <= deadline_date:
             renewed = 0.0
@@ -235,7 +240,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
         else:
             renewed = 1.0
             choice_target = "untimely_notice_automatic_renewal_triggered"
-            
+
         state = {
             "agreement_clause": (
                 "Section 11.2 (Term and Renewal):\n"
@@ -254,7 +259,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
             "timely_notice_termination_effective": "Notice of non-renewal was provided at least 60 days prior to expiration; contract terminates at end of term.",
             "untimely_notice_automatic_renewal_triggered": "Notice was provided fewer than 60 days prior to expiration; contract automatically renews for successive 12-month term.",
             "immediate_material_breach_termination": "Party terminated for immediate material breach under Section 11.3.",
-            "mutual_rescission_agreement": "Parties executed a bilateral written rescission agreement extinguishing all obligations."
+            "mutual_rescission_agreement": "Parties executed a bilateral written rescission agreement extinguishing all obligations.",
         }
         item = {
             "state": state,
@@ -267,12 +272,12 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
                 "did_contract_renew_automatically": {
                     "type": "noul",
                     "instructions": "Did the agreement automatically renew for a successive 12-month term due to late or missing notice?",
-                }
+                },
             },
             "targets": {
                 "renewal_disposition": choice_target,
                 "did_contract_renew_automatically": renewed,
-            }
+            },
         }
         items.append(item)
 
@@ -284,7 +289,7 @@ def generate_temporal_numeric_samples(count: int = 1000) -> list[dict[str, Any]]
 # ==============================================================================
 def generate_long_policy_samples(count: int = 1000) -> list[dict[str, Any]]:
     items = []
-    
+
     # Template generator creating 1,500 to 2,500 token comprehensive legal and policy frameworks
     policy_domains = [
         ("Cybersecurity Incident Indemnification & Carve-Outs", "indemnification"),
@@ -293,40 +298,33 @@ def generate_long_policy_samples(count: int = 1000) -> list[dict[str, Any]]:
         ("Software License Intellectual Property Infringement Indemnity", "ip_infringement"),
         ("Enterprise Cloud Service Level Agreement (SLA) Credit Escalation", "sla_credit"),
     ]
-    
+
     for i in range(count):
         domain_name, domain_key = policy_domains[i % len(policy_domains)]
-        org_a = f"Global Enterprise Group {i+1}"
-        org_b = f"Strategic Partner Alliance {i+1}"
-        
+        org_a = f"Global Enterprise Group {i + 1}"
+        org_b = f"Strategic Partner Alliance {i + 1}"
+
         # Build 4-level exception tree
         # Level 1: General Rule
         # Level 2: Primary Exclusion
         # Level 3: Carve-back Exception
         # Level 4: Rider / Schedule Superseding Override
-        
+
         # Decide which level governs this sample (0: General Rule, 1: Exclusion, 2: Carve-back, 3: Rider Override)
         governing_level = i % 4
-        
+
         filler_clauses = [
             f"1.{j} Standard Operating Procedure and Regulatory Compliance. Each party warrants compliance with ISO/IEC 27001, SOC 2 Type II, and NIST Cybersecurity Framework standards across all sub-tier data environments. Audits shall be conducted biannually by independent certified public accountants."
             for j in range(1, 10)
         ]
-        
-        governing_texts = {
-            0: "The base indemnification rule applies without disqualifying exclusions or conflicting riders.",
-            1: "The primary exclusion applies because the incident arose directly from unauthorized credential sharing by client employees.",
-            2: "The carve-back exception revives liability because the vendor failed to patch known Critical CVE within 14 days of publication.",
-            3: "Rider Schedule Z explicitly supersedes all exclusions and caps liability at a fixed liquidated amount of $2,500,000."
-        }
-        
+
         crit = {
             "full_indemnity_governed_by_general_rule": "The general indemnification obligation governs in full; no exclusions or carve-outs are triggered.",
             "excluded_under_primary_carve_out": "Liability is completely excluded under Section 4.2 due to client employee misconduct or gross negligence.",
             "liability_revived_under_exception_to_exclusion": "Exclusion is negated and liability is restored under Section 4.3 due to vendor failure to apply critical security patches.",
-            "superseded_by_special_rider_endorsement": "Terms are overridden by Rider Schedule Z, which establishes fixed liquidated damages regardless of underlying fault."
+            "superseded_by_special_rider_endorsement": "Terms are overridden by Rider Schedule Z, which establishes fixed liquidated damages regardless of underlying fault.",
         }
-        
+
         target_keys = [
             "full_indemnity_governed_by_general_rule",
             "excluded_under_primary_carve_out",
@@ -334,7 +332,7 @@ def generate_long_policy_samples(count: int = 1000) -> list[dict[str, Any]]:
             "superseded_by_special_rider_endorsement",
         ]
         chosen_target = target_keys[governing_level]
-        
+
         document_body = f"""MASTER STRATEGIC ALLIANCE CONTRACT ({domain_name})
 BETWEEN: {org_a} ("Company") AND {org_b} ("Service Provider")
 DOCUMENT CLASSIFICATION: CONFIDENTIAL & PROPRIETARY | REF: MSA-2026-T4-{i:04d}
@@ -375,7 +373,7 @@ CASE INCIDENT FACTS:
         if governing_level == 0:
             document_body = document_body.replace(
                 "Company employee credentials were leaked via an external phishing attack (triggers Section 4.2(b)).",
-                "No employee negligence, credential sharing, or configuration errors were identified on Company's side."
+                "No employee negligence, credential sharing, or configuration errors were identified on Company's side.",
             )
 
         item = {
@@ -393,12 +391,12 @@ CASE INCIDENT FACTS:
                 "is_service_provider_liable": {
                     "type": "noul",
                     "instructions": "Is the Service Provider legally obligated to provide indemnification or pay liquidated damages for this incident?",
-                }
+                },
             },
             "targets": {
                 "governing_determination": chosen_target,
                 "is_service_provider_liable": 0.0 if governing_level == 1 else 1.0,
-            }
+            },
         }
         items.append(item)
 
@@ -410,22 +408,22 @@ CASE INCIDENT FACTS:
 # ==============================================================================
 def generate_multi_hop_samples(count: int = 500) -> list[dict[str, Any]]:
     items = []
-    
+
     for i in range(count):
         # 4 chained conditions across different articles
         # Condition 1 (Article 2): Entity is Tier 1 Cloud Provider
         # Condition 2 (Article 5): ISO 27001 Certification current within 12 months
         # Condition 3 (Article 7): Data residency strictly confined to EU-West or US-East
         # Condition 4 (Article 12): Zero unresolved High Severity security findings older than 30 days
-        
+
         c1 = random.choice([True, False])
         c2 = random.choice([True, False])
         c3 = random.choice([True, False])
         c4 = random.choice([True, False])
-        
+
         all_passed = c1 and c2 and c3 and c4
-        
-        state_doc = f"""COMPLIANCE CERTIFICATION AUDIT REPORT (AUD-2026-{1000+i})
+
+        state_doc = f"""COMPLIANCE CERTIFICATION AUDIT REPORT (AUD-2026-{1000 + i})
 TARGET SYSTEM: Orion Multi-Tenant Core Cluster
 
 SECTION 2: CLOUD INFRASTRUCTURE TIER
@@ -451,9 +449,9 @@ To qualify for the Enterprise Sovereign Trust Standard, an infrastructure candid
             "qualified_sovereign_trust": "All 4 cross-clause conditions (Tier 1, current ISO, region confinement, SLA adherence) are simultaneously satisfied.",
             "disqualified_infrastructure_tier": "Fails Section 2 requirements: infrastructure is not a certified Tier 1 hyperscaler.",
             "disqualified_expired_security_cert": "Fails Section 5 requirements: security accreditation is expired or missing required certification.",
-            "disqualified_regional_or_vulnerability_breach": "Fails Section 7 or Section 12: data residency violations or unresolved High severity CVEs exceeding SLA."
+            "disqualified_regional_or_vulnerability_breach": "Fails Section 7 or Section 12: data residency violations or unresolved High severity CVEs exceeding SLA.",
         }
-        
+
         if all_passed:
             target_choice = "qualified_sovereign_trust"
             target_noul = 1.0
@@ -469,9 +467,9 @@ To qualify for the Enterprise Sovereign Trust Standard, an infrastructure candid
 
         item = {
             "state": {
-                "audit_id": f"AUD-2026-{1000+i}",
+                "audit_id": f"AUD-2026-{1000 + i}",
                 "report_text": state_doc,
-                "clause_evaluations": {"sec2": c1, "sec5": c2, "sec7": c3, "sec12": c4}
+                "clause_evaluations": {"sec2": c1, "sec5": c2, "sec7": c3, "sec12": c4},
             },
             "questions": {
                 "certification_decision": {
@@ -482,12 +480,12 @@ To qualify for the Enterprise Sovereign Trust Standard, an infrastructure candid
                 "meets_sovereign_trust_standard": {
                     "type": "noul",
                     "instructions": "Does the system fully satisfy all four cross-clause requirements for Enterprise Sovereign Trust certification?",
-                }
+                },
             },
             "targets": {
                 "certification_decision": target_choice,
                 "meets_sovereign_trust_standard": target_noul,
-            }
+            },
         }
         items.append(item)
 
@@ -499,17 +497,19 @@ To qualify for the Enterprise Sovereign Trust Standard, an infrastructure candid
 # ==============================================================================
 def generate_ambiguous_abstain_samples(count: int = 500) -> list[dict[str, Any]]:
     items = []
-    
+
     for i in range(count):
-        is_abstain = (i % 2 == 0)
-        
+        is_abstain = i % 2 == 0
+
         if is_abstain:
-            ambiguity_reason = random.choice([
-                "Contradictory amendments: Amendment 4 states effective date is Jan 1, while Amendment 5 (executed same day) states effective date is Dec 31.",
-                "Missing required exhibits: Agreement stipulates rates are in Exhibit C, but Exhibit C is omitted from the file records.",
-                "Undisclosed corporate jurisdiction: Tax liability depends on incorporating country, but registration fields are blank.",
-                "Ambiguous pronouns and conflicting dates: Record states 'the party shall deliver on the date stated above', where two conflicting dates appear above."
-            ])
+            ambiguity_reason = random.choice(
+                [
+                    "Contradictory amendments: Amendment 4 states effective date is Jan 1, while Amendment 5 (executed same day) states effective date is Dec 31.",
+                    "Missing required exhibits: Agreement stipulates rates are in Exhibit C, but Exhibit C is omitted from the file records.",
+                    "Undisclosed corporate jurisdiction: Tax liability depends on incorporating country, but registration fields are blank.",
+                    "Ambiguous pronouns and conflicting dates: Record states 'the party shall deliver on the date stated above', where two conflicting dates appear above.",
+                ]
+            )
             state_text = (
                 f"DOCUMENT CASE REVIEW FILE #{7000 + i}\n"
                 f"STATUS: UNDER SPECIAL REVIEW\n"
@@ -535,12 +535,12 @@ def generate_ambiguous_abstain_samples(count: int = 500) -> list[dict[str, Any]]
             "conclusive_approval_under_standard_rules": "Documentation is clear, complete, and uncontradicted; standard approval granted.",
             "conclusive_rejection_for_cause": "Documentation conclusively establishes violation of statutory or contract standards.",
             "abstain_due_to_conflicting_or_missing_evidence": "Records contain irreconcilable contradictions, missing schedules, or ambiguous definitions requiring abstention.",
-            "conditional_provisional_intake": "Minor administrative fee pending but all legal terms clear."
+            "conditional_provisional_intake": "Minor administrative fee pending but all legal terms clear.",
         }
 
         item = {
             "state": {
-                "file_id": f"REV-2026-{7000+i}",
+                "file_id": f"REV-2026-{7000 + i}",
                 "review_text": state_text,
             },
             "questions": {
@@ -552,12 +552,12 @@ def generate_ambiguous_abstain_samples(count: int = 500) -> list[dict[str, Any]]
                 "is_conclusively_approved": {
                     "type": "noul",
                     "instructions": "Can this transaction be conclusively approved without abstaining or requiring manual legal review?",
-                }
+                },
             },
             "targets": {
                 "case_determination": target_choice,
                 "is_conclusively_approved": target_noul,
-            }
+            },
         }
         items.append(item)
 

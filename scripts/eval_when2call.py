@@ -22,7 +22,6 @@ import os
 import random
 import sys
 import time
-from typing import Any
 
 import numpy as np
 import torch
@@ -57,18 +56,24 @@ def get_hf_token() -> str | None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate ClassOne on NVIDIA When2Call.")
-    parser.add_argument("--model", type=str, default="devops-thiago/classone-qwen3.5-9b",
-                        help="Model identifier or local checkpoint path.")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu",
-                        help="Execution device.")
-    parser.add_argument("--limit", type=int, default=100,
-                        help="Number of samples to evaluate (0 for full split).")
-    parser.add_argument("--heads", type=str, default=None,
-                        help="Path to classone_heads.pt file (optional).")
-    parser.add_argument("--pause-tokens", type=int, default=8,
-                        help="Number of latent pause tokens.")
-    parser.add_argument("--output", type=str, default="benchmarks/results/when2call_results.json",
-                        help="Path to save evaluation metrics.")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="devops-thiago/classone-qwen3.5-9b",
+        help="Model identifier or local checkpoint path.",
+    )
+    parser.add_argument(
+        "--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="Execution device."
+    )
+    parser.add_argument("--limit", type=int, default=100, help="Number of samples to evaluate (0 for full split).")
+    parser.add_argument("--heads", type=str, default=None, help="Path to classone_heads.pt file (optional).")
+    parser.add_argument("--pause-tokens", type=int, default=8, help="Number of latent pause tokens.")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="benchmarks/results/when2call_results.json",
+        help="Path to save evaluation metrics.",
+    )
     return parser.parse_args()
 
 
@@ -125,6 +130,7 @@ def main() -> None:
         elif "/" in args.model:
             try:
                 from huggingface_hub import hf_hub_download
+
                 print(f"[*] Downloading classone_heads.pt from {args.model}...")
                 heads_path = hf_hub_download(repo_id=args.model, filename="classone_heads.pt", token=token)
             except Exception as e:
@@ -134,6 +140,7 @@ def main() -> None:
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
         if os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
             from peft import PeftModel
+
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
         heads_data = torch.load(heads_path, map_location=args.device)
@@ -157,7 +164,7 @@ def main() -> None:
         query = row.get("question", "")
         tools_list = row.get("tools", [])
         parsed_tools = []
-        for t in (tools_list if isinstance(tools_list, list) else []):
+        for t in tools_list if isinstance(tools_list, list) else []:
             try:
                 parsed_tools.append(json.loads(t) if isinstance(t, str) else t)
             except Exception:
@@ -189,10 +196,9 @@ def main() -> None:
         latencies.append(latency_ms)
 
         pred_choice = res.choice
-        prob_dist = res.probabilities
         conf = res.confidence
 
-        is_correct = (pred_choice == correct_answer)
+        is_correct = pred_choice == correct_answer
         y_true.append(correct_answer)
         y_pred.append(pred_choice)
         confidences.append(conf)
@@ -203,7 +209,9 @@ def main() -> None:
 
         if (idx + 1) % 25 == 0 or (idx + 1) == len(samples):
             current_acc = sum(yt == yp for yt, yp in zip(y_true, y_pred)) / len(y_true) * 100.0
-            print(f"  [{idx + 1:4d}/{len(samples)}] Accuracy: {current_acc:5.1f}% | Median Latency: {np.median(latencies):.1f} ms")
+            print(
+                f"  [{idx + 1:4d}/{len(samples)}] Accuracy: {current_acc:5.1f}% | Median Latency: {np.median(latencies):.1f} ms"
+            )
 
     # Aggregate metrics
     overall_acc = sum(yt == yp for yt, yp in zip(y_true, y_pred)) / len(y_true) * 100.0
@@ -211,12 +219,11 @@ def main() -> None:
     p95_latency = float(np.percentile(latencies, 95))
 
     acc_binary = [1.0 if yt == yp else 0.0 for yt, yp in zip(y_true, y_pred)]
-    ece_val = expected_calibration_error(torch.tensor(confidences, dtype=torch.float32), torch.tensor(acc_binary, dtype=torch.float32))
+    ece_val = expected_calibration_error(
+        torch.tensor(confidences, dtype=torch.float32), torch.tensor(acc_binary, dtype=torch.float32)
+    )
 
-    per_class_acc = {
-        cls: (per_class_correct.get(cls, 0) / per_class_total[cls] * 100.0)
-        for cls in per_class_total
-    }
+    per_class_acc = {cls: (per_class_correct.get(cls, 0) / per_class_total[cls] * 100.0) for cls in per_class_total}
 
     results_payload = {
         "benchmark": "NVIDIA When2Call (mcq)",
@@ -234,7 +241,7 @@ def main() -> None:
     all_results = {}
     if os.path.exists(args.output):
         try:
-            with open(args.output, "r", encoding="utf-8") as f:
+            with open(args.output, encoding="utf-8") as f:
                 loaded = json.load(f)
                 if isinstance(loaded, dict) and "models" in loaded:
                     all_results = loaded

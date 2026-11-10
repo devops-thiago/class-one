@@ -70,12 +70,6 @@ class ClassOnePromptBuilder:
             and tokenizer.convert_tokens_to_ids("<unused0>") is not None
             and tokenizer.convert_tokens_to_ids("<unused0>") != getattr(tokenizer, "unk_token_id", -1)
         )
-        has_existing_custom = (
-            not has_unused
-            and hasattr(tokenizer, "convert_tokens_to_ids")
-            and tokenizer.convert_tokens_to_ids("<|state_start|>") is not None
-            and tokenizer.convert_tokens_to_ids("<|state_start|>") != getattr(tokenizer, "unk_token_id", -1)
-        )
 
         if has_unused:
             # Map delimiters to native in-vocab reserved tokens (<unused0>..<unused12>)

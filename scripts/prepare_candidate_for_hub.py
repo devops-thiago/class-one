@@ -20,6 +20,7 @@ import json
 import os
 import shutil
 import sys
+
 import torch
 from transformers import AutoTokenizer
 
@@ -54,9 +55,13 @@ def inspect_temperatures(heads_path: str):
         print(f"[*] Calibrated temperatures: {temps}")
         for k, val in temps.items():
             if val > 1.0:
-                print(f"[!] WARNING: Temperature {k}={val:.3f} > 1.0! Unconstrained temperatures flatten option margins.")
+                print(
+                    f"[!] WARNING: Temperature {k}={val:.3f} > 1.0! Unconstrained temperatures flatten option margins."
+                )
             elif val < 0.35:
-                print(f"[!] WARNING: Temperature {k}={val:.3f} < 0.35! Extremely low temperatures may cause overconfidence.")
+                print(
+                    f"[!] WARNING: Temperature {k}={val:.3f} < 0.35! Extremely low temperatures may cause overconfidence."
+                )
             else:
                 print(f"    [OK] Temperature {k}={val:.3f} within optimal range.")
     else:
@@ -65,9 +70,13 @@ def inspect_temperatures(heads_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare candidate checkpoint for HF upload")
-    parser.add_argument("--snapshot-dir", type=str, required=True, help="Snapshot directory containing classone_heads.pt")
+    parser.add_argument(
+        "--snapshot-dir", type=str, required=True, help="Snapshot directory containing classone_heads.pt"
+    )
     parser.add_argument("--target-dir", type=str, required=True, help="Target merged directory to stage for upload")
-    parser.add_argument("--repo-id", type=str, required=True, help="Target HF repo ID (e.g. devops-thiago/classone-qwen3.5-9b)")
+    parser.add_argument(
+        "--repo-id", type=str, required=True, help="Target HF repo ID (e.g. devops-thiago/classone-qwen3.5-9b)"
+    )
     parser.add_argument("--pause-tokens", type=int, default=8, help="Default latent pause tokens")
     args = parser.parse_args()
 
@@ -92,7 +101,7 @@ def main():
     # Check snapshot metadata if present
     meta_path = os.path.join(args.snapshot_dir, "snapshot_metadata.json")
     if os.path.exists(meta_path):
-        with open(meta_path, "r", encoding="utf-8") as f:
+        with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
         print(f"[*] Snapshot Metadata:\n    {json.dumps(meta, indent=4)}")
 
@@ -125,10 +134,10 @@ def main():
     print("\n" + "=" * 80)
     print("PREPARATION COMPLETE! RUN THE ATOMIC UPLOAD COMMAND BELOW:")
     print("=" * 80)
-    print(f"python scripts/push_to_hub.py `")
-    print(f"  --checkpoint-dir \"{args.target_dir}\" `")
-    print(f"  --repo-id \"{args.repo_id}\" `")
-    print(f"  --update-heads-only\n")
+    print("python scripts/push_to_hub.py `")
+    print(f'  --checkpoint-dir "{args.target_dir}" `')
+    print(f'  --repo-id "{args.repo_id}" `')
+    print("  --update-heads-only\n")
     print(f"Candidate Head SHA256: {head_sha}")
     print("=" * 80)
 

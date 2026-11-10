@@ -60,6 +60,7 @@ def calculate_speed_score(p50_sec: float, p95_sec: float) -> tuple[float, float,
     Score(s) = clamp(100 - 20 * log10(s / 0.1), 0, 100)
     Speed = (Score(p50) + Score(p95)) / 2
     """
+
     def s_score(s: float) -> float:
         if s <= 0:
             return 100.0
@@ -71,7 +72,9 @@ def calculate_speed_score(p50_sec: float, p95_sec: float) -> tuple[float, float,
     return (score_p50 + score_p95) / 2.0, score_p50, score_p95
 
 
-def calculate_cost_score(avg_tokens_per_decision: float, tariff_per_m: float = GEMMA_TARIFF_PER_M_TOKENS) -> tuple[float, float]:
+def calculate_cost_score(
+    avg_tokens_per_decision: float, tariff_per_m: float = GEMMA_TARIFF_PER_M_TOKENS
+) -> tuple[float, float]:
     """Computes JevBench Cost score in US$ per 1,000 decisions.
 
     Cost per 1k = (avg_tokens * 1000 * tariff_per_m) / 1,000,000
@@ -143,6 +146,7 @@ class ApiEvaluator:
     def __init__(self, endpoint_url: str = "http://127.0.0.1:8000/v1/decide"):
         self.endpoint_url = endpoint_url
         import httpx
+
         self.client = httpx.Client(timeout=30.0)
 
     def decide(self, state: Any, q_type: str, instructions: str, criteria: Any) -> dict[str, Any]:
@@ -150,12 +154,7 @@ class ApiEvaluator:
         if q_type in ("choice", "score") and criteria:
             question_payload["criteria"] = criteria
 
-        payload = {
-            "state": str(state),
-            "questions": {
-                "q": question_payload
-            }
-        }
+        payload = {"state": str(state), "questions": {"q": question_payload}}
         t0 = time.perf_counter()
         resp = self.client.post(self.endpoint_url, json=payload)
         lat_sec = time.perf_counter() - t0
@@ -170,7 +169,9 @@ class ApiEvaluator:
 class LocalEvaluator:
     """Evaluates tasks using local PyTorch model weights."""
 
-    def __init__(self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None, pause_tokens: int = 0):
+    def __init__(
+        self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None, pause_tokens: int = 0
+    ):
         import torch
         from transformers import AutoTokenizer
 
@@ -201,6 +202,7 @@ class LocalEvaluator:
 
     def decide(self, state: Any, q_type: str, instructions: str, criteria: Any) -> dict[str, Any]:
         from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
+
         if q_type == "noul":
             co_q = NoulQuestion(instructions=instructions)
         elif q_type == "choice":
@@ -282,8 +284,7 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
                 criteria = {str(i): str(c) for i, c in enumerate(raw_crit)}
             elif isinstance(raw_crit, dict):
                 criteria = {
-                    str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v))
-                    for k, v in raw_crit.items()
+                    str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v)) for k, v in raw_crit.items()
                 }
             else:
                 criteria = {"yes": "yes", "no": "no"}
@@ -317,7 +318,7 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
             prob = decision.get("noul", 0.5)
             pred_bool = prob >= 0.5
             expected_bool = str(expected).lower() in ("yes", "true", "1")
-            is_correct = (pred_bool == expected_bool)
+            is_correct = pred_bool == expected_bool
             conf = prob if pred_bool else (1.0 - prob)
 
         elif q_type == "choice":
@@ -328,7 +329,7 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
                 is_correct = False
                 conf = 0.0
             else:
-                is_correct = (str(pred_choice) == str(expected))
+                is_correct = str(pred_choice) == str(expected)
                 conf = max(norm_probs.values()) if norm_probs else decision.get("confidence", 0.5)
 
         elif q_type == "score":
@@ -345,7 +346,7 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
                     pred_score = decision.get("score", 1.0)
                     pred_idx = int(round(pred_score)) - 1
                 expected_idx = int(expected)
-                is_correct = (pred_idx == expected_idx)
+                is_correct = pred_idx == expected_idx
                 conf = max(norm_probs.values()) if norm_probs else decision.get("confidence", 0.5)
 
         acc_int = 1 if is_correct else 0
@@ -360,15 +361,17 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
             type_stats[q_type]["correct"] += acc_int
             type_stats[q_type]["chance_corrected"].append(cc_score)
 
-        results.append({
-            "task_id": idx,
-            "type": q_type,
-            "correct": is_correct,
-            "confidence": round(float(conf), 4),
-            "chance_baseline": round(chance_baseline, 4),
-            "chance_corrected": round(cc_score, 2),
-            "latency_ms": round(lat_sec * 1000.0, 2),
-        })
+        results.append(
+            {
+                "task_id": idx,
+                "type": q_type,
+                "correct": is_correct,
+                "confidence": round(float(conf), 4),
+                "chance_baseline": round(chance_baseline, 4),
+                "chance_corrected": round(cc_score, 2),
+                "latency_ms": round(lat_sec * 1000.0, 2),
+            }
+        )
 
         if (idx + 1) % 25 == 0 or (idx + 1) == len(tasks):
             curr_acc = (sum(all_accs) / len(all_accs)) * 100.0 if all_accs else 0.0
@@ -402,7 +405,7 @@ def run_evaluation(evaluator: Any, tier_name: str, tasks: list[dict[str, Any]]) 
             qt: {
                 "correct": s["correct"],
                 "total": s["total"],
-                "accuracy": round((s["correct"] / s["total"] * 100.0) if s["total"] > 0 else 0.0, 2)
+                "accuracy": round((s["correct"] / s["total"] * 100.0) if s["total"] > 0 else 0.0, 2),
             }
             for qt, s in type_stats.items()
         },
@@ -426,7 +429,9 @@ def main():
         default=None,
         help="Decision heads file (optional, defaults to classone_heads.pt inside model path)",
     )
-    parser.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device")
+    parser.add_argument(
+        "--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device"
+    )
     parser.add_argument("--quant", default="4bit", help="Backbone quantization (4bit or 8bit)")
     parser.add_argument("--pause-tokens", type=int, default=0, help="Number of latent pause tokens (default: 0)")
     args = parser.parse_args()
@@ -470,9 +475,15 @@ def main():
         total_tokens_weighted += res["avg_tokens"] * tier_weight
 
     # 1. Axis 1: Intelligence (Equal type weights Choice 33.3%, Noul 33.3%, Score 33.3% across tiers)
-    overall_choice = np.mean([r["type_intelligence"]["choice"] for r in tier_results if r["type_stats"]["choice"]["total"] > 0])
-    overall_noul = np.mean([r["type_intelligence"]["noul"] for r in tier_results if r["type_stats"]["noul"]["total"] > 0])
-    overall_score = np.mean([r["type_intelligence"]["score"] for r in tier_results if r["type_stats"]["score"]["total"] > 0])
+    overall_choice = np.mean(
+        [r["type_intelligence"]["choice"] for r in tier_results if r["type_stats"]["choice"]["total"] > 0]
+    )
+    overall_noul = np.mean(
+        [r["type_intelligence"]["noul"] for r in tier_results if r["type_stats"]["noul"]["total"] > 0]
+    )
+    overall_score = np.mean(
+        [r["type_intelligence"]["score"] for r in tier_results if r["type_stats"]["score"]["total"] > 0]
+    )
     intelligence_score = float((overall_choice + overall_noul + overall_score) / 3.0)
 
     # 2. Axis 2: Calibration (ECE and Brier score over all predictions)
@@ -507,8 +518,12 @@ def main():
     print(f"          • Choice Intelligence    : {overall_choice:.2f}")
     print(f"          • Noul Intelligence      : {overall_noul:.2f}")
     print(f"          • Score Intelligence     : {overall_score:.2f}")
-    print(f"  Axis 2: Calibration (25%)        : {cal_score:.2f} pts (ECE: {overall_ece:.4f}, Brier: {brier_score:.4f})")
-    print(f"  Axis 3: Speed (25%)              : {speed_score:.2f} pts (p50: {p50_sec * 1000.0:.1f}ms, p95: {p95_sec * 1000.0:.1f}ms)")
+    print(
+        f"  Axis 2: Calibration (25%)        : {cal_score:.2f} pts (ECE: {overall_ece:.4f}, Brier: {brier_score:.4f})"
+    )
+    print(
+        f"  Axis 3: Speed (25%)              : {speed_score:.2f} pts (p50: {p50_sec * 1000.0:.1f}ms, p95: {p95_sec * 1000.0:.1f}ms)"
+    )
     print(f"  Axis 4: Cost (25%)               : {cost_score:.2f} pts (${cost_per_1k:.5f} / 1,000 decisions)")
     print(f"  Penalty Gate (<50 Intelligence)  : {quadratic_gate:.4f}")
     print("=" * 80)

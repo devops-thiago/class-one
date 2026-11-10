@@ -85,6 +85,7 @@ class ApiEvaluator:
     def __init__(self, endpoint_url: str = "http://127.0.0.1:8000/v1/decide"):
         self.endpoint_url = endpoint_url
         import httpx
+
         self.client = httpx.Client(timeout=30.0)
 
     def decide(self, state: Any, q_type: str, instructions: str, criteria: Any) -> dict[str, Any]:
@@ -92,12 +93,7 @@ class ApiEvaluator:
         if q_type in ("choice", "score") and criteria:
             question_payload["criteria"] = criteria
 
-        payload = {
-            "state": str(state),
-            "questions": {
-                "q": question_payload
-            }
-        }
+        payload = {"state": str(state), "questions": {"q": question_payload}}
         t0 = time.perf_counter()
         resp = self.client.post(self.endpoint_url, json=payload)
         lat_sec = time.perf_counter() - t0
@@ -112,7 +108,9 @@ class ApiEvaluator:
 class LocalEvaluator:
     """Evaluates tasks using local PyTorch model weights."""
 
-    def __init__(self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None, pause_tokens: int = 0):
+    def __init__(
+        self, model_path: str, heads_path: str, device: str = "cuda:0", quant: str = None, pause_tokens: int = 0
+    ):
         import torch
         from transformers import AutoTokenizer
 
@@ -140,6 +138,7 @@ class LocalEvaluator:
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
         if os.path.exists(lora_dir):
             from peft import PeftModel
+
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             self.model.backbone = PeftModel.from_pretrained(self.model.backbone, lora_dir)
 
@@ -151,6 +150,7 @@ class LocalEvaluator:
 
     def decide(self, state: Any, q_type: str, instructions: str, criteria: Any) -> dict[str, Any]:
         from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
+
         if q_type == "noul":
             co_q = NoulQuestion(instructions=instructions)
         elif q_type == "choice":
@@ -232,12 +232,12 @@ def evaluate_domain(evaluator: Any, domain_key: str, domain_info: dict[str, Any]
             prob = data.get("noul", 0.5)
             pred_bool = prob >= 0.5
             expected_bool = bool(expected)
-            is_correct = (pred_bool == expected_bool)
+            is_correct = pred_bool == expected_bool
             conf = prob if pred_bool else (1.0 - prob)
 
         elif q_type == "choice":
             pred = data.get("choice")
-            is_correct = (str(pred) == str(expected))
+            is_correct = str(pred) == str(expected)
             probs = data.get("probabilities", {})
             conf = max(probs.values()) if probs else data.get("confidence", 0.5)
 
@@ -250,7 +250,7 @@ def evaluate_domain(evaluator: Any, domain_key: str, domain_info: dict[str, Any]
                 pred_score = data.get("score", 1.0)
                 pred_idx = int(round(pred_score)) - 1
             expected_idx = int(expected)
-            is_correct = (pred_idx == expected_idx)
+            is_correct = pred_idx == expected_idx
             conf = max(probs.values()) if probs else data.get("confidence", 0.5)
 
         acc_int = 1 if is_correct else 0
@@ -269,7 +269,9 @@ def evaluate_domain(evaluator: Any, domain_key: str, domain_info: dict[str, Any]
     p50_lat = float(np.median(latencies)) * 1000.0 if latencies else 0.0
     ece = compute_ece(confidences, accuracies)
 
-    print(f"    Raw Accuracy: {correct_count}/{tot} ({raw_acc:.1f}%) | Chance-Corrected Score: {domain_score:.2f}% | Latency p50: {p50_lat:.1f}ms")
+    print(
+        f"    Raw Accuracy: {correct_count}/{tot} ({raw_acc:.1f}%) | Chance-Corrected Score: {domain_score:.2f}% | Latency p50: {p50_lat:.1f}ms"
+    )
 
     return {
         "domain": domain_key,
@@ -301,7 +303,9 @@ def main():
         default=None,
         help="Decision heads file (optional, defaults to classone_heads.pt inside model path)",
     )
-    parser.add_argument("--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device")
+    parser.add_argument(
+        "--device", default="cuda:0" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cuda:0", help="PyTorch device"
+    )
     parser.add_argument("--quant", default="4bit", help="Backbone quantization")
     parser.add_argument("--pause-tokens", type=int, default=0, help="Number of latent pause tokens (default: 0)")
     args = parser.parse_args()
@@ -350,7 +354,9 @@ def main():
     print("-" * 80)
     print("  Domain Breakdown (Radar Chart Metrics):")
     for r in all_domain_results:
-        print(f"    • {r['display_name']:<32} (wt: {r['weight']*100:>4.1f}%): {r['domain_score']:>6.2f} pts (Raw Acc: {r['raw_accuracy']}%)")
+        print(
+            f"    • {r['display_name']:<32} (wt: {r['weight'] * 100:>4.1f}%): {r['domain_score']:>6.2f} pts (Raw Acc: {r['raw_accuracy']}%)"
+        )
     print("=" * 80)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -391,9 +397,7 @@ def main():
         "submission_date": time.strftime("%Y-%m-%d", time.gmtime()),
         "hardware_environment": "2x NVIDIA RTX 5060 Ti 16GB",
         "overall_index": round(weighted_score, 2),
-        "domain_scores": {
-            r["domain"]: round(r["domain_score"], 2) for r in all_domain_results
-        },
+        "domain_scores": {r["domain"]: round(r["domain_score"], 2) for r in all_domain_results},
         "metrics": {
             "ece": round(overall_ece, 4),
             "latency_p50_ms": round(p50_ms, 2),

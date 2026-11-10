@@ -118,8 +118,8 @@ def test_compute_ece():
 
 
 def test_classone_adapter_protocol():
-    from classone_adapter import ClassOneAdapter, DecisionResult
     from classone.adapter import ClassOneAdapter as PkgAdapter
+    from classone_adapter import ClassOneAdapter, DecisionResult
 
     assert ClassOneAdapter is PkgAdapter
     adapter = ClassOneAdapter()

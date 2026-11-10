@@ -2,6 +2,7 @@
 """Soups baseline Qwen 2B heads with new FP16 Hard-Tier heads."""
 
 import os
+
 import torch
 
 HEADS_A_PATH = "checkpoints/snapshots/rollback_qwen2b_pre_fp16/classone_heads.pt"
@@ -36,6 +37,7 @@ def main():
 
     # Copy LoRA adapter to the soup directory as well
     import shutil
+
     src_lora = "checkpoints/qwen2b_fp16_candidate/lora_backbone"
     dst_lora = os.path.join(OUTPUT_SOUP_DIR, "lora_backbone")
     if os.path.exists(src_lora):

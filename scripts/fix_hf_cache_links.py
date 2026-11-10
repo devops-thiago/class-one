@@ -20,7 +20,6 @@ import argparse
 import os
 import shutil
 import sys
-from typing import List, Optional
 
 # Ensure UTF-8 output on Windows consoles
 if sys.platform == "win32":
@@ -40,7 +39,7 @@ DEFAULT_CACHE_DIRS = [
 ]
 
 
-def find_hf_cache() -> Optional[str]:
+def find_hf_cache() -> str | None:
     for p in DEFAULT_CACHE_DIRS:
         if p and os.path.exists(p):
             return os.path.abspath(p)
@@ -52,10 +51,7 @@ def fix_model_snapshots(model_dir: str, dry_run: bool = False) -> int:
     if not os.path.exists(snapshots_dir):
         return 0
 
-    snapshot_hashes = [
-        d for d in os.listdir(snapshots_dir)
-        if os.path.isdir(os.path.join(snapshots_dir, d))
-    ]
+    snapshot_hashes = [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
     if len(snapshot_hashes) <= 1:
         return 0
 
@@ -84,7 +80,7 @@ def fix_model_snapshots(model_dir: str, dry_run: bool = False) -> int:
         for w_name, src_path in known_weights.items():
             if w_name not in existing_files:
                 dst_path = os.path.join(s_path, w_name)
-                sz_gb = os.path.getsize(src_path) / (1024 ** 3)
+                sz_gb = os.path.getsize(src_path) / (1024**3)
                 print(f"    [+] Snapshot {sh[:10]}... missing {w_name} ({sz_gb:.2f} GB)")
 
                 if not dry_run:
@@ -107,7 +103,9 @@ def fix_model_snapshots(model_dir: str, dry_run: bool = False) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description="Fix Windows HF Cache snapshots missing safetensors")
-    parser.add_argument("--repo-id", type=str, default=None, help="Specific model repo (e.g. devops-thiago/classone-qwen3.5-9b)")
+    parser.add_argument(
+        "--repo-id", type=str, default=None, help="Specific model repo (e.g. devops-thiago/classone-qwen3.5-9b)"
+    )
     parser.add_argument("--cache-dir", type=str, default=None, help="Custom HF cache hub directory path")
     parser.add_argument("--dry-run", action="store_true", help="Report missing files without modifying")
     args = parser.parse_args()

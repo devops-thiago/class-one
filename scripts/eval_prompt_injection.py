@@ -19,7 +19,6 @@ import argparse
 import json
 import os
 import time
-from typing import Any
 
 import numpy as np
 import torch
@@ -63,20 +62,22 @@ def get_hf_token() -> str | None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate ClassOne on deepset/prompt-injections.")
-    parser.add_argument("--model", type=str, default="Qwen/Qwen3.5-4B",
-                        help="Model identifier or local checkpoint path.")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu",
-                        help="Execution device.")
-    parser.add_argument("--limit", type=int, default=0,
-                        help="Number of samples to evaluate (0 for full test split).")
-    parser.add_argument("--heads", type=str, default=None,
-                        help="Path to classone_heads.pt file (optional).")
-    parser.add_argument("--pause-tokens", type=int, default=0,
-                        help="Number of latent pause tokens.")
-    parser.add_argument("--quant", type=str, default=None,
-                        help="Backbone quantization ('4bit', 'none').")
-    parser.add_argument("--output", type=str, default="benchmarks/results/prompt_injection_results.json",
-                        help="Path to save evaluation metrics.")
+    parser.add_argument(
+        "--model", type=str, default="Qwen/Qwen3.5-4B", help="Model identifier or local checkpoint path."
+    )
+    parser.add_argument(
+        "--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="Execution device."
+    )
+    parser.add_argument("--limit", type=int, default=0, help="Number of samples to evaluate (0 for full test split).")
+    parser.add_argument("--heads", type=str, default=None, help="Path to classone_heads.pt file (optional).")
+    parser.add_argument("--pause-tokens", type=int, default=0, help="Number of latent pause tokens.")
+    parser.add_argument("--quant", type=str, default=None, help="Backbone quantization ('4bit', 'none').")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="benchmarks/results/prompt_injection_results.json",
+        help="Path to save evaluation metrics.",
+    )
     return parser.parse_args()
 
 
@@ -131,6 +132,7 @@ def main() -> None:
         elif "/" in args.model:
             try:
                 from huggingface_hub import hf_hub_download
+
                 print(f"[*] Downloading classone_heads.pt from {args.model}...")
                 heads_path = hf_hub_download(repo_id=args.model, filename="classone_heads.pt", token=token)
             except Exception as e:
@@ -140,6 +142,7 @@ def main() -> None:
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
         if os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
             from peft import PeftModel
+
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
         heads_data = torch.load(heads_path, map_location=args.device)
@@ -187,7 +190,9 @@ def main() -> None:
 
         if (idx + 1) % 25 == 0 or (idx + 1) == len(samples):
             curr_acc = np.mean(np.array(y_true) == np.array(y_pred_labels)) * 100.0
-            print(f"  [{idx + 1:>3}/{len(samples)}] Accuracy: {curr_acc:>5.1f}% | Median Latency: {np.median(latencies):>5.1f} ms")
+            print(
+                f"  [{idx + 1:>3}/{len(samples)}] Accuracy: {curr_acc:>5.1f}% | Median Latency: {np.median(latencies):>5.1f} ms"
+            )
 
     y_true_arr = np.array(y_true)
     y_pred_arr = np.array(y_pred_labels)
@@ -226,7 +231,7 @@ def main() -> None:
     all_results = {}
     if os.path.exists(args.output):
         try:
-            with open(args.output, "r", encoding="utf-8") as f:
+            with open(args.output, encoding="utf-8") as f:
                 loaded = json.load(f)
                 if isinstance(loaded, dict) and "models" in loaded:
                     all_results = loaded

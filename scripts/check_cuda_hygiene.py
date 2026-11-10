@@ -26,7 +26,7 @@ if sys.platform == "win32":
 def get_token() -> str | None:
     token = os.environ.get("HF_TOKEN")
     if not token and os.path.exists(".env"):
-        with open(".env", "r", encoding="utf-8") as f:
+        with open(".env", encoding="utf-8") as f:
             for line in f:
                 if line.strip().startswith("HF_TOKEN="):
                     token = line.strip().split("=", 1)[1].strip().strip("'\"")
@@ -50,6 +50,7 @@ def main():
     # 2. PyTorch & CUDA Detection
     try:
         import torch
+
         print(f"[*] PyTorch Version:   {torch.__version__}")
         cuda_avail = torch.cuda.is_available()
         print(f"[*] CUDA Available:    {cuda_avail}")
@@ -59,18 +60,22 @@ def main():
             print(f"[*] CUDA Device Count: {num_devices}")
             for i in range(num_devices):
                 props = torch.cuda.get_device_properties(i)
-                total_gb = props.total_memory / (1024 ** 3)
+                total_gb = props.total_memory / (1024**3)
                 free_b, total_b = torch.cuda.mem_get_info(i)
-                free_gb = free_b / (1024 ** 3)
-                used_gb = (total_b - free_b) / (1024 ** 3)
-                print(f"    - GPU {i}: {props.name} ({total_gb:.1f} GB Total | {free_gb:.1f} GB Free | {used_gb:.1f} GB Used)")
+                free_gb = free_b / (1024**3)
+                used_gb = (total_b - free_b) / (1024**3)
+                print(
+                    f"    - GPU {i}: {props.name} ({total_gb:.1f} GB Total | {free_gb:.1f} GB Free | {used_gb:.1f} GB Used)"
+                )
 
             # Check allocator config
             alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", "")
             if "expandable_segments:True" in alloc_conf or "expandable_segments:true" in alloc_conf:
                 print("    [OK] PYTORCH_CUDA_ALLOC_CONF includes expandable_segments:True")
             else:
-                print(f"    [!] NOTE: PYTORCH_CUDA_ALLOC_CONF='{alloc_conf}'. Recommend setting 'expandable_segments:True' to prevent virtual memory fragmentation.")
+                print(
+                    f"    [!] NOTE: PYTORCH_CUDA_ALLOC_CONF='{alloc_conf}'. Recommend setting 'expandable_segments:True' to prevent virtual memory fragmentation."
+                )
         else:
             print("    [!] ERROR: CUDA is not available in this PyTorch installation!")
     except ImportError:
@@ -78,6 +83,7 @@ def main():
 
     # 3. Multiprocessing
     import multiprocessing as mp
+
     start_method = mp.get_start_method()
     print(f"[*] Multiprocessing Start Method: {start_method}")
     if sys.platform == "win32" and start_method != "spawn":

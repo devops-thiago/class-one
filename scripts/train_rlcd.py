@@ -254,6 +254,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
             lora_dir = os.path.join(os.path.dirname(args.pretrained_heads), "lora_backbone")
             if args.heads_only and os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
                 from peft import PeftModel
+
                 if is_main_process:
                     print(f"[*] Attaching frozen LoRA adapter from {lora_dir}...")
                 model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
@@ -299,6 +300,7 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
         full_dataset = ClassOneDataset.load_jsonl(args.data)
         if args.max_samples and len(full_dataset.items) > args.max_samples:
             import random
+
             rng = random.Random(42)
             items_copy = list(full_dataset.items)
             rng.shuffle(items_copy)

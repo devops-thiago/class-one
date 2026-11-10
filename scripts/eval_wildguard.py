@@ -64,18 +64,26 @@ def compute_auroc(y_true: np.ndarray, y_scores: list[float]) -> float:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate ClassOne on WildGuardTest.")
-    parser.add_argument("--model", type=str, default="devops-thiago/classone-qwen3.5-9b",
-                        help="Model identifier or local checkpoint path.")
-    parser.add_argument("--heads", type=str, default=None,
-                        help="Optional path to classone_heads.pt.")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu",
-                        help="Execution device.")
-    parser.add_argument("--limit", type=int, default=100,
-                        help="Number of test samples to evaluate (0 for full 1,725 split).")
-    parser.add_argument("--pause-tokens", type=int, default=8,
-                        help="Number of latent pause tokens.")
-    parser.add_argument("--output", type=str, default="benchmarks/results/wildguard_results.json",
-                        help="Path to save evaluation metrics.")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="devops-thiago/classone-qwen3.5-9b",
+        help="Model identifier or local checkpoint path.",
+    )
+    parser.add_argument("--heads", type=str, default=None, help="Optional path to classone_heads.pt.")
+    parser.add_argument(
+        "--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="Execution device."
+    )
+    parser.add_argument(
+        "--limit", type=int, default=100, help="Number of test samples to evaluate (0 for full 1,725 split)."
+    )
+    parser.add_argument("--pause-tokens", type=int, default=8, help="Number of latent pause tokens.")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="benchmarks/results/wildguard_results.json",
+        help="Path to save evaluation metrics.",
+    )
     return parser.parse_args()
 
 
@@ -124,6 +132,7 @@ def main() -> None:
             heads_path = local_cand
         elif "/" in args.model:
             from huggingface_hub import hf_hub_download
+
             print(f"[*] Downloading classone_heads.pt from {args.model}...")
             heads_path = hf_hub_download(repo_id=args.model, filename="classone_heads.pt", token=token)
 
@@ -131,6 +140,7 @@ def main() -> None:
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
         if os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
             from peft import PeftModel
+
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
         heads_data = torch.load(heads_path, map_location=args.device)
@@ -177,7 +187,9 @@ def main() -> None:
 
         if (idx + 1) % 25 == 0 or (idx + 1) == len(samples):
             curr_acc = np.mean(np.array(y_true) == np.array(y_pred)) * 100.0
-            print(f"  [{idx + 1:3d}/{len(samples)}] Accuracy: {curr_acc:5.1f}% | p50 Latency: {np.median(latencies):5.1f} ms")
+            print(
+                f"  [{idx + 1:3d}/{len(samples)}] Accuracy: {curr_acc:5.1f}% | p50 Latency: {np.median(latencies):5.1f} ms"
+            )
 
     y_true_arr = np.array(y_true)
     y_pred_arr = np.array(y_pred)

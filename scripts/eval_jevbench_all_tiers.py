@@ -205,6 +205,7 @@ def main():
     lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
     if os.path.exists(os.path.join(lora_dir, "adapter_config.json")) and "--no-lora" not in sys.argv:
         from peft import PeftModel
+
         print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
         model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
 
