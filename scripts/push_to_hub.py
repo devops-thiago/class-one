@@ -335,7 +335,15 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Faithfulness** | 9 | **0.850** | **77.8%** | 0.2895 | 513.4 ms |
 | **Honesty (Deception)** | 11 | **0.833** | **63.6%** | 0.2482 | 536.0 ms |
 | **Refusal (Jailbreaks)** | 11 | **0.600** | **45.5%** | 0.3167 | 670.6 ms |
-| **Overall Balanced Accuracy** | **100** | **0.562** | **51.5%** | **0.3101** | **487.9 ms** |"""
+| **Overall Balanced Accuracy** | **100** | **0.562** | **51.5%** | **0.3101** | **487.9 ms** |
+
+### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+
+| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **89.00%** (89.10% BalAcc) | **0.9441 AUROC** (**94.6%** Vanilla, **81.8%** Adversarial) | **0.0895** | 100.4 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **77.59%** (90/116) | **0.8388 AUROC** (**91.1%** Benign Spec, **65.0%** Recall) | 0.1684 | 64.3 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **33.00%** | **97.1%** `tool_call` (33/34) | 0.5928 | 288.8 ms |"""
     elif is_qwen2b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -369,7 +377,15 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Faithfulness** | 9 | **0.800** | **55.6%** | 0.3486 | 184.2 ms |
 | **Honesty (Deception)** | 11 | **0.767** | **72.7%** | 0.2207 | 188.9 ms |
 | **Concealing Uncertainty** | 14 | **0.571** | **64.3%** | 0.3795 | 115.3 ms |
-| **Overall Balanced Accuracy** | **100** | **0.568** | **51.0%** | **0.3261** | **173.2 ms** |"""
+| **Overall Balanced Accuracy** | **100** | **0.568** | **51.0%** | **0.3261** | **173.2 ms** |
+
+### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+
+| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **80.00%** (79.41% BalAcc) | **0.8798 AUROC** (**94.2%** Harm Recall, **89.3%** Vanilla) | 0.1746 | 59.4 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **73.28%** (85/116) | **0.8110 AUROC** (**80.4%** Benign Spec, **66.7%** Recall) | 0.1942 | 47.5 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **32.00%** | **91.2%** `tool_call` (31/34) | 0.4763 | 115.1 ms |"""
     elif is_e4b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -421,7 +437,15 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 | **Privacy (Secret Leaks)** | 14 | **0.571** | **64.3%** | 0.3666 | 353.1 ms |
 | **Concealing Uncertainty** | 14 | **0.510** | **64.3%** | 0.3784 | 288.6 ms |
 | **Bias** | 9 | 0.225 | **55.6%** | 0.1921 | 465.0 ms |
-| **Overall Balanced Accuracy** | **100** | **0.583** | **63.3%** | **0.2874** | **425.9 ms** |"""
+| **Overall Balanced Accuracy** | **100** | **0.583** | **63.3%** | **0.2874** | **425.9 ms** |
+
+### 5. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+
+| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **84.00%** (84.46% BalAcc) | **0.9217 AUROC** (**95.8%** Benign Spec, **81.8%** Adversarial) | **0.1298** | 132.7 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **63.79%** (74/116) | **0.6229 AUROC** (**98.2%** Benign Spec) | 0.2814 | 81.5 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **43.00%** | **94.1%** `tool_call`, **29.2%** `request_for_info` | 0.4017 | 305.3 ms |"""
     else:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 
@@ -450,7 +474,15 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 | **Refusal (Jailbreaks)** | 11 | 0.500 | **63.6%** | **0.0974** | 267.5 ms |
 | **Faithfulness** | 9 | **0.700** | **55.6%** | 0.2513 | 200.0 ms |
 | **Bias** | 9 | **0.525** | **55.6%** | 0.2141 | 217.9 ms |
-| **Overall Balanced Accuracy** | **100** | **0.505** | **56.2%** | **0.1944** | **199.2 ms** |"""
+| **Overall Balanced Accuracy** | **100** | **0.505** | **56.2%** | **0.1944** | **199.2 ms** |
+
+### 3. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+
+| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **72.00%** (72.04% BalAcc) | **0.7993 AUROC** (**78.6%** Vanilla, **72.9%** Benign Spec) | **0.1597** | 43.5 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **50.86%** (59/116) | **0.6214 AUROC** (**75.0%** Injection Recall) | 0.3412 | 41.6 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **35.00%** | **85.3%** `tool_call` (29/34) | 0.5376 | 106.8 ms |"""
 
     return f"""---
 license: apache-2.0
@@ -526,11 +558,12 @@ def generate_lora_card(repo_id: str, base_model: str) -> str:
     """Generates a LoRA adapter card for the lora_backbone/ subfolder."""
     short_name = repo_id.split("/")[-1]
     creator = "Alibaba Cloud (Qwen Team)" if "qwen" in base_model.lower() else "Google"
+    yaml_base = repo_id if "e4b" in base_model.lower() else base_model
     return f"""---
-base_model: {base_model}
+base_model: {yaml_base}
 library_name: peft
 tags:
-  - base_model:adapter:{base_model}
+  - base_model:adapter:{yaml_base}
   - lora
   - peft
   - classone
@@ -703,20 +736,15 @@ def _publish_adapter(api: HfApi, args, token: str):
     lora_dir = os.path.join(args.checkpoint_dir, "lora_backbone")
     if os.path.exists(lora_dir):
         print(f"\n[2/3] Uploading LoRA backbone adapters from {lora_dir}/")
+        lora_readme = os.path.join(lora_dir, "README.md")
+        with open(lora_readme, "w", encoding="utf-8") as f:
+            f.write(generate_lora_card(args.repo_id, args.base_model))
         api.upload_folder(
             folder_path=lora_dir,
             path_in_repo="lora_backbone",
             repo_id=args.repo_id,
             token=token,
             commit_message="Upload LoRA backbone adapters",
-        )
-        # Replace the stock PEFT placeholder card with a real adapter card
-        api.upload_file(
-            path_or_fileobj=generate_lora_card(args.repo_id, args.base_model).encode("utf-8"),
-            path_in_repo="lora_backbone/README.md",
-            repo_id=args.repo_id,
-            token=token,
-            commit_message="Add LoRA adapter card",
         )
         print("      ✓ lora_backbone/")
     else:
@@ -725,7 +753,9 @@ def _publish_adapter(api: HfApi, args, token: str):
     # 3. Upload model card
     print("\n[3/3] Uploading model card (README.md)...")
     api.upload_file(
-        path_or_fileobj=generate_model_card(args.repo_id, args.base_model).encode("utf-8"),
+        path_or_fileobj=generate_model_card(
+            args.repo_id, args.base_model, standalone=bool(args.update_heads_only)
+        ).encode("utf-8"),
         path_in_repo="README.md",
         repo_id=args.repo_id,
         token=token,
