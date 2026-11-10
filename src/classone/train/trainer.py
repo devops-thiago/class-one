@@ -432,7 +432,7 @@ class ClassOneTrainer:
         )
 
         # If LoRA was attached, save adapters
-        if hasattr(self.model.backbone, "save_pretrained"):
+        if hasattr(self.model.backbone, "save_pretrained") and not self.heads_only:
             lora_dir = os.path.join(output_dir, "lora_backbone")
             self.model.backbone.save_pretrained(lora_dir)
 

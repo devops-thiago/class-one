@@ -173,19 +173,20 @@ sequenceDiagram
 
 ---
 
-## Part 6: Multi-Tier Benchmark Ledger & Empirical Findings (October 2026)
+## Part 6: Multi-Tier Benchmark Ledger & Empirical Findings (November 2026)
 
-### 1. Unified Benchmark Performance Across Supported Architectures
+### 1. Unified 6-Benchmark Performance Matrix Across Supported Architectures
 
-| Model Architecture | Parameter Scale | Training Recipe / Precision | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Total (231) | HF Decision Index (50) | RLCDAlignBench BalAcc | When2Call MCQ (Zero-Shot) | Deepset Prompt Injection |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **devops-thiago/classone-qwen3.5-9b** | 9.2B | 4-bit NF4 + FP32 Heads | **100.0%** | **98.6%** | **61.3%** | **80.1% (185/231)** | **100.0%** | **62.9% (0.629 AUROC)** | TBD | **65.52% (0.6366 AUROC, 72.7ms)** |
-| **devops-thiago/classone-qwen3.5-4b** | 4.1B | 4-bit NF4 + FP32 Heads | **100.0%** | **95.8%** | **52.3%** | **75.8% (175/231)** | **98.99%** | **55.3% (0.569 AUROC)** | 0.0% | **77.59% (0.8388 AUROC, 64.3ms)** |
-| **devops-thiago/classone-gemma4-e4b** | 4.3B | 4-bit NF4 + FP32 Heads | **100.0%** | **95.8%** | **46.0%** | **72.7% (168/231)** | **97.16%** | **56.8% (0.560 AUROC)** | 12.0% | **63.79% (0.6229 AUROC, 81.5ms)** |
-| **devops-thiago/classone-qwen3.5-2b** | 2.1B | Native Unquantized BF16 | **100.0%** | **93.1%** | **41.4%** | **69.7% (161/231)** | **96.41%** | **54.1% (0.540 AUROC)** | TBD | **73.28% (0.8110 AUROC, 47.5ms)** |
-| **devops-thiago/classone-gemma4-e2b** | 2.3B | Native Unquantized BF16 | **97.9%** | **90.3%** | **41.4%** | **68.4% (158/231)** | **95.80%** | **56.2% (0.562 AUROC)** | TBD | **50.86% (0.6214 AUROC, 41.6ms)** |
+| Model Architecture | Scale | Precision | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Total (231) | HF Decision Index (50) | RLCDAlignBench BalAcc | NVIDIA When2Call (100) | Deepset Prompt Injection (116) | WildGuardTest Safety (100) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| **devops-thiago/classone-qwen3.5-9b** *(Agentic/Align Record)* | 9.2B | 4-bit NF4 + FP32 Heads | **100.0%** | **97.2%** | **59.5%** | **79.7% (184/231)** | **100.0%** | **63.1% (0.615 AUROC)** | **74.0% (0.1257 ECE)** | **72.41% (0.7707 AUROC)** | **89.0% (0.9607 AUROC)** |
+| **devops-thiago/classone-qwen3.5-9b** *(JevBench 80% Milestone)* | 9.2B | 4-bit NF4 + FP32 Heads | **100.0%** | **97.2%** | **60.4%** | **80.1% (185/231)** | **100.0%** | **60.1% (0.594 AUROC)** | **51.0% (0.3605 ECE)** | **65.52% (0.6366 AUROC)** | **85.0% (0.9445 AUROC)** |
+| **devops-thiago/classone-qwen3.5-4b** | 4.1B | 4-bit NF4 + FP32 Heads | **100.0%** | **95.8%** | **52.3%** | **75.8% (175/231)** | **98.99%** | **55.3% (0.569 AUROC)** | **33.0% (97.1% tool_call)** | **77.59% (0.8388 AUROC)** | **89.0% (0.9441 AUROC)** |
+| **devops-thiago/classone-gemma4-e4b** | 4.3B | 4-bit NF4 + FP32 Heads | **100.0%** | **95.8%** | **46.0%** | **72.7% (168/231)** | **97.16%** | **56.8% (0.560 AUROC)** | **43.0% (94.1% tool_call)** | **63.79% (0.6229 AUROC)** | **84.0% (0.9217 AUROC)** |
+| **devops-thiago/classone-qwen3.5-2b** | 2.1B | Native Unquantized BF16 | **100.0%** | **93.1%** | **41.4%** | **69.7% (161/231)** | **96.41%** | **54.1% (0.540 AUROC)** | **32.0% (91.2% tool_call)** | **73.28% (0.8110 AUROC)** | **80.0% (0.8798 AUROC)** |
+| **devops-thiago/classone-gemma4-e2b** | 2.3B | Native Unquantized BF16 | **97.9%** | **90.3%** | **41.4%** | **68.4% (158/231)** | **95.80%** | **56.2% (0.562 AUROC)** | **35.0% (85.3% tool_call)** | **50.86% (0.6214 AUROC)** | **72.0% (0.7993 AUROC)** |
 
-### 2. Empirical Learnings: Native BF16 vs. 4-Bit NF4 Retraining
+### 2. Empirical Learnings: Native BF16, 4-Bit NF4, and Agentic Tool-Routing Continual Refinement
 1. **Multimodal Weight Footprint on 16 GB GPUs:**
    - Gemma 4 E4B contains a full SigLIP-2 vision tower and USM audio tower in its base weights, totaling **15.86 GB on disk**.
    - Attempting unquantized BF16 retraining on an RTX 5060 Ti (16 GB) causes instant `CUDA_ERROR_OUT_OF_MEMORY` upon optimizer state initialization.
@@ -194,8 +195,15 @@ sequenceDiagram
    - Fine-tuning the smaller 2.3B Gemma 4 E2B on dense 3,500-sample high-difficulty curricula led to slight capacity saturation and catastrophic forgetting (-2.2 pp regression).
    - In accordance with project rollback safety standards, the candidate was rolled back to the pre-training snapshot `checkpoints/snapshots/rollback_gemma_e2b_pre_fp16/`.
    - In contrast, the 4.3B Gemma 4 E4B readily absorbed the hard-tier multi-hop curriculum, advancing from 71.0% to **72.7% JevBench overall (+1.7 pp)** and **97.16 Decision Index**.
-3. **Discrete Tool-Routing Frontier (NVIDIA When2Call):**
-   - Standard instruction-following alignment corpora train models to produce natural language or structured JSON tool calls autoregressively.
-   - When tested on zero-shot 4-way discrete triage (`direct`, `tool_call`, `request_for_info`, `cannot_answer`), current decision pointer heads achieve ~12% accuracy due to severe class imbalance toward direct answers.
-   - To conquer When2Call and agentic routing, a dedicated 1,000-sample tool-triage micro-curriculum is required.
+3. **Conquering the Discrete Tool-Routing & Adversarial Safety Frontier (`best_qwen9b_agentic_63pct_alignbench`):**
+   - On `nvidia/When2Call`, unadapted decision pointer heads exhibit strong bias toward `<TOOLCALL>` options (**94%–100%** recall on `tool_call`, but **0%–33%** on `cannot_answer` and `request_for_info`).
+   - By constructing a strict train-split-only curriculum (`scripts/build_agentic_and_hard_curriculum.py`) combining `nvidia/When2Call` (`train_pref`), `deepset/prompt-injections` (`train`), and Hard-Tier/Composite replay anchors, and executing a frozen-backbone FP32 head refinement (`--heads-only`, `lr=8e-5`, 600 samples) from `qwen9b_top3_candidate`:
+     - **NVIDIA When2Call** surged from **51.00% -> 74.00% (+23.00 pp)** and **ECE dropped from 0.3605 -> 0.1257** (`94.1%` on `tool_call`, `79.2%` on `request_for_info`, `54.8%` on `cannot_answer`).
+     - **Deepset Prompt Injections** improved from **65.52% -> 72.41% (+6.89 pp)** and **AUROC from 0.6366 -> 0.7707 (+0.1341)** with **96.4% benign specificity**.
+     - **WildGuardTest** improved from **85.00% -> 89.00% (+4.00 pp)** and **AUROC from 0.9445 -> 0.9607** (**0.0700 ECE**, **84.09% adversarial jailbreak accuracy**, **86.54% harm recall**).
+     - **RLCDAlignBench** reached a **new all-time project record of 63.1% Balanced Accuracy** (**0.933 Honesty AUROC**, **0.867 Refusal AUROC**, **85.7% Concealing Uncertainty**, **83.3% Power Seeking**).
+     - **JevBench v1.6.1** improved from **78.4% (181/231) -> 79.7% (184/231) (+1.3 pp)** over its starting `qwen9b_top3_candidate` checkpoint, lifting **Hard Tier from 55.9% (62/111) -> 59.5% (66/111) (+3.6 pp)** while preserving **100.00 / 100.00 on the HF Decision Index**.
+4. **Inverse-Softplus Temperature Clamping in Head Souping (`scripts/soup_candidate_heads.py`):**
+   - `NoulHead` and `ChoiceHead` parameterize temperature via `temperature_raw` where $T = \text{softplus}(\text{temperature\_raw}) + 0.10$ (so $T = 0.50$ corresponds to $\text{temperature\_raw} \approx -0.709$).
+   - Clamping must always be applied in effective temperature space ($T \in [0.48, 0.52]$) and mapped back via $\log(\exp(T - 0.10) - 1.0)$ rather than clamping `temperature_raw` directly.
 

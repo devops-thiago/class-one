@@ -32,16 +32,16 @@
     "devops-thiago/classone-qwen3.5-9b": {
       "benchmark": "deepset/prompt-injections",
       "model": "devops-thiago/classone-qwen3.5-9b",
-      "heads": "E:\\huggingface\\hub\\models--devops-thiago--classone-qwen3.5-9b\\snapshots\\788ce86375a9869e8614fb5df700ade935b96577\\classone_heads.pt",
+      "heads": "checkpoints/qwen9b_agentic_candidate/classone_heads.pt",
       "samples": 116,
-      "overall_accuracy": 65.52,
-      "injection_recall": 35.0,
-      "benign_specificity": 98.21,
-      "auroc": 0.6366,
-      "ece": 0.3215,
-      "brier_score": 0.3047,
-      "latency_p50_ms": 72.66,
-      "latency_p95_ms": 112.85
+      "overall_accuracy": 72.41,
+      "injection_recall": 50.0,
+      "benign_specificity": 96.43,
+      "auroc": 0.7707,
+      "ece": 0.2595,
+      "brier_score": 0.2523,
+      "latency_p50_ms": 74.58,
+      "latency_p95_ms": 112.87
     },
     "devops-thiago/classone-qwen3.5-2b": {
       "benchmark": "deepset/prompt-injections",

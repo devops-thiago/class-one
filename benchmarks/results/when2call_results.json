@@ -4,31 +4,96 @@
     "devops-thiago/classone-gemma4-e4b": {
       "benchmark": "NVIDIA When2Call (mcq)",
       "model": "devops-thiago/classone-gemma4-e4b",
-      "sample_count": 50,
-      "overall_accuracy_pct": 12.0,
-      "ece": 0.5739,
-      "latency_p50_ms": 279.17,
-      "latency_p95_ms": 627.63,
+      "sample_count": 100,
+      "overall_accuracy_pct": 43.0,
+      "ece": 0.4017,
+      "latency_p50_ms": 305.31,
+      "latency_p95_ms": 718.18,
       "per_class_accuracy_pct": {
-        "cannot_answer": 12.0
+        "cannot_answer": 9.523809523809524,
+        "request_for_info": 29.166666666666668,
+        "tool_call": 94.11764705882352
       },
       "per_class_counts": {
-        "cannot_answer": 50
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
       }
     },
     "devops-thiago/classone-qwen3.5-4b": {
       "benchmark": "NVIDIA When2Call (mcq)",
       "model": "devops-thiago/classone-qwen3.5-4b",
-      "sample_count": 50,
-      "overall_accuracy_pct": 0.0,
-      "ece": 0.8776,
-      "latency_p50_ms": 254.09,
-      "latency_p95_ms": 620.29,
+      "sample_count": 100,
+      "overall_accuracy_pct": 33.0,
+      "ece": 0.5928,
+      "latency_p50_ms": 288.81,
+      "latency_p95_ms": 702.12,
       "per_class_accuracy_pct": {
-        "cannot_answer": 0.0
+        "cannot_answer": 0.0,
+        "request_for_info": 0.0,
+        "tool_call": 97.05882352941177
       },
       "per_class_counts": {
-        "cannot_answer": 50
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "devops-thiago/classone-qwen3.5-9b": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "devops-thiago/classone-qwen3.5-9b",
+      "sample_count": 100,
+      "overall_accuracy_pct": 74.0,
+      "ece": 0.1257,
+      "latency_p50_ms": 374.69,
+      "latency_p95_ms": 867.84,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 54.761904761904766,
+        "request_for_info": 79.16666666666666,
+        "tool_call": 94.11764705882352
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "devops-thiago/classone-qwen3.5-2b": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "devops-thiago/classone-qwen3.5-2b",
+      "sample_count": 100,
+      "overall_accuracy_pct": 32.0,
+      "ece": 0.4763,
+      "latency_p50_ms": 115.12,
+      "latency_p95_ms": 280.83,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 0.0,
+        "request_for_info": 4.166666666666666,
+        "tool_call": 91.17647058823529
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "devops-thiago/classone-gemma4-e2b": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "devops-thiago/classone-gemma4-e2b",
+      "sample_count": 100,
+      "overall_accuracy_pct": 35.0,
+      "ece": 0.5376,
+      "latency_p50_ms": 106.79,
+      "latency_p95_ms": 266.96,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 14.285714285714285,
+        "request_for_info": 0.0,
+        "tool_call": 85.29411764705883
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
       }
     }
   }

@@ -167,6 +167,12 @@ def parse_args():
         default=False,
         help="Train only decision heads (freezing backbone with torch.no_grad for fast head training)",
     )
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Optional cap on number of items loaded from --data (deterministic shuffle)",
+    )
     return parser.parse_args()
 
 
@@ -245,6 +251,14 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
         if is_main_process:
             print(f"[*] Loading pre-trained decision heads from local file {args.pretrained_heads}...")
         try:
+            lora_dir = os.path.join(os.path.dirname(args.pretrained_heads), "lora_backbone")
+            if args.heads_only and os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
+                from peft import PeftModel
+                if is_main_process:
+                    print(f"[*] Attaching frozen LoRA adapter from {lora_dir}...")
+                model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
+                for p in model.backbone.parameters():
+                    p.requires_grad = False
             heads_data = torch.load(args.pretrained_heads, map_location=device)
             model.noul_head.load_state_dict(heads_data["noul_head"], strict=False)
             model.choice_head.load_state_dict(heads_data["choice_head"], strict=False)
@@ -283,6 +297,12 @@ def run_training_worker(rank: int, world_size: int, args, q_out=None, q_in=None)
     # Load dataset
     if args.data and os.path.exists(args.data):
         full_dataset = ClassOneDataset.load_jsonl(args.data)
+        if args.max_samples and len(full_dataset.items) > args.max_samples:
+            import random
+            rng = random.Random(42)
+            items_copy = list(full_dataset.items)
+            rng.shuffle(items_copy)
+            full_dataset = ClassOneDataset(items_copy[: args.max_samples])
         if is_main_process:
             print(f"[*] Loaded {len(full_dataset)} items from {args.data}")
     else:

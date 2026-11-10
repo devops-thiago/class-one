@@ -4,11 +4,11 @@
     "tasks": 48,
     "correct": 48,
     "accuracy": 100.0,
-    "ece": 0.0015,
+    "ece": 0.0022,
     "brier": 0.0,
-    "latency_p50_ms": 117.73,
-    "latency_mean_ms": 119.83,
-    "latency_p95_ms": 124.24,
+    "latency_p50_ms": 111.68,
+    "latency_mean_ms": 140.59,
+    "latency_p95_ms": 144.09,
     "type_breakdown": {
       "noul": {
         "correct": 12,
@@ -27,20 +27,20 @@
   {
     "tier": "Original",
     "tasks": 72,
-    "correct": 69,
-    "accuracy": 95.83,
-    "ece": 0.025,
-    "brier": 0.0339,
-    "latency_p50_ms": 116.99,
-    "latency_mean_ms": 114.24,
-    "latency_p95_ms": 132.74,
+    "correct": 70,
+    "accuracy": 97.22,
+    "ece": 0.0182,
+    "brier": 0.0182,
+    "latency_p50_ms": 110.4,
+    "latency_mean_ms": 108.9,
+    "latency_p95_ms": 142.89,
     "type_breakdown": {
       "noul": {
-        "correct": 24,
+        "correct": 23,
         "total": 24
       },
       "choice": {
-        "correct": 33,
+        "correct": 35,
         "total": 36
       },
       "score": {
@@ -52,24 +52,24 @@
   {
     "tier": "Hard",
     "tasks": 111,
-    "correct": 49,
-    "accuracy": 44.14,
-    "ece": 0.4076,
-    "brier": 0.3568,
-    "latency_p50_ms": 254.22,
-    "latency_mean_ms": 542.09,
-    "latency_p95_ms": 1487.57,
+    "correct": 64,
+    "accuracy": 57.66,
+    "ece": 0.2629,
+    "brier": 0.2983,
+    "latency_p50_ms": 318.82,
+    "latency_mean_ms": 635.04,
+    "latency_p95_ms": 1633.98,
     "type_breakdown": {
       "noul": {
-        "correct": 18,
+        "correct": 20,
         "total": 38
       },
       "choice": {
-        "correct": 30,
+        "correct": 40,
         "total": 67
       },
       "score": {
-        "correct": 1,
+        "correct": 4,
         "total": 6
       }
     }

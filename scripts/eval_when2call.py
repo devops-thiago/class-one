@@ -132,7 +132,7 @@ def main() -> None:
 
     if heads_path and os.path.exists(heads_path):
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
-        if os.path.exists(lora_dir):
+        if os.path.exists(os.path.join(lora_dir, "adapter_config.json")):
             from peft import PeftModel
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
             model.backbone = PeftModel.from_pretrained(model.backbone, lora_dir)
