@@ -51,7 +51,11 @@ def fix_model_snapshots(model_dir: str, dry_run: bool = False) -> int:
     if not os.path.exists(snapshots_dir):
         return 0
 
-    snapshot_hashes = [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+    snapshot_hashes = sorted(
+        [d for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))],
+        key=lambda d: os.path.getmtime(os.path.join(snapshots_dir, d)),
+        reverse=True,
+    )
     if len(snapshot_hashes) <= 1:
         return 0
 

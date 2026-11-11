@@ -19,6 +19,10 @@ class NoulQuestion(BaseModel):
 
     type: Literal["noul"] = "noul"
     instructions: str = Field(..., description="Prompt/instruction for the boolean check.")
+    criteria: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional explicit true/false or yes/no decision criteria.",
+    )
 
 
 class ChoiceQuestion(BaseModel):

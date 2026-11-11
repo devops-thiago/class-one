@@ -190,7 +190,16 @@ class ClassOnePromptBuilder:
 
                 for opt_key, opt_desc in q.criteria.items():
                     opt_keys.append(opt_key)
-                    opt_text = f"{d_opt_start}\nKey: {opt_key}\nCriteria: {opt_desc}\n{d_opt_end}\n"
+                    clean_desc = str(opt_desc).strip() if opt_desc is not None else ""
+                    if not clean_desc or clean_desc.lower() == "none":
+                        k_low = str(opt_key).strip().lower()
+                        if k_low in ("yes", "true"):
+                            clean_desc = "Yes — affirmative, the condition holds."
+                        elif k_low in ("no", "false"):
+                            clean_desc = "No — negative, the condition does not hold."
+                        else:
+                            clean_desc = str(opt_key)
+                    opt_text = f"{d_opt_start}\nKey: {opt_key}\nCriteria: {clean_desc}\n{d_opt_end}\n"
                     opt_ids = self.tokenizer.encode(opt_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
                     current_ids.extend(opt_ids)

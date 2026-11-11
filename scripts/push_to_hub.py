@@ -259,13 +259,13 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0029** | **0.0000** | **112.8 ms** |
-| **Original** | 72 | **97.2%–98.6%** (70–71/72) | **0.0189** | **0.0203** | **111.5 ms** |
-| **Hard** | 111 | **59.5%–60.4%** (66–67/111) | 0.2476 | 0.2946 | **320.1 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0029–0.0031** | **0.0000–0.0001** | **112.8 ms** |
+| **Original** | 72 | **97.2%–98.6%** (70–71/72) | **0.0059** | **0.0209–0.0213** | **111.5 ms** |
+| **Hard** | 111 | **59.5%–60.4%** (66–67/111) | 0.2476–0.2537 | 0.2939–0.2946 | **320.1 ms** |
 | **Overall Aggregate** | **231** | **79.7%–80.1%** (184–185/231) | — | — | **112.8 ms** |
 
-- **Easy Tier:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12). Near-zero 0.0029 ECE.
-- **Original Tier:** Choice: **97.2%–100.0%** (35–36/36); Score: **100.0%** (12/12); Noul: **95.8%** (23/24).
+- **Easy Tier:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12). Near-zero 0.0029–0.0031 ECE.
+- **Original Tier:** Choice: **97.2%–100.0%** (35–36/36); Score: **100.0%** (12/12); Noul: **95.8%** (23/24); **0.0059 ECE**.
 - **Hard Tier:** Choice: **61.2%** (41/67); Noul: **55.3%** (21/38); Score: **66.7%** (4/6).
 
 ### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
@@ -277,7 +277,7 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Retrieval** | 10 | **100.0%** (10/10) |
 | **Rubric** | 10 | **100.0%** (10/10) |
 | **Tools** | 10 | **100.0%** (10/10) |
-| **Overall Decision Index** | **50** | **100.0%** (50/50, 0.0147 ECE) |
+| **Overall Decision Index** | **50** | **100.0%** (50/50, 0.0138–0.0152 ECE) |
 
 ### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
 
@@ -285,21 +285,24 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **Honesty (Deception)** | 11 | **0.933** | **81.8%** | 0.2031 | 709.5 ms |
-| **Refusal (Jailbreaks)** | 11 | **0.867** | **72.7%** | 0.2362 | 875.0 ms |
-| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.1898 | 693.6 ms |
-| **Concealing Uncertainty** | 14 | **0.755** | **85.7%** | 0.3514 | 432.9 ms |
-| **Faithfulness** | 9 | **0.750** | **66.7%** | 0.1780 | 682.0 ms |
-| **Prompt Injection** | 8 | **0.625** | **62.5%** | 0.3678 | 552.7 ms |
-| **Overall Balanced Accuracy** | **100** | **0.615** | **63.1%** | **0.3055** | **648.2 ms** |
+| **Honesty (Deception)** | 11 | **0.933** | **81.8%** | 0.2067 | 756.0 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.867** | **81.8%** | 0.2240 | 901.0 ms |
+| **Faithfulness** | 9 | **0.800** | **66.7%** | 0.2328 | 729.0 ms |
+| **Power Seeking** | 6 | **0.778** | **83.3%** | 0.1912 | 716.7 ms |
+| **Concealing Uncertainty** | 14 | **0.776** | **85.7%** | 0.3477 | 448.8 ms |
+| **Social Bias** | 9 | **0.675** | **55.6%** | 0.4213 | 738.2 ms |
+| **Prompt Injection** | 8 | **0.625** | **50.0%–62.5%** | 0.4695 | 584.6 ms |
+| **Privacy** | 14 | **0.612** | **50.0%** | 0.3584 | 570.0 ms |
+| **Sycophancy** | 9 | **0.250–0.300** | **44.4%** | 0.6490 | 667.8 ms |
+| **Overall Balanced Accuracy** | **100** | **0.623** | **65.1%** | **0.3240** | **694.7 ms** |
 
 ### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **74.00%** | **94.1%** `tool_call`, **79.2%** `request_for_info` | **0.1257** | 374.7 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **75.00%** | **97.1%** `tool_call`, **79.2%** `request_for_info` | **0.1322** | 385.9 ms |
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **89.00%** (89.10% BalAcc) | **0.9607 AUROC** (**84.1%** Adversarial, **91.7%** Benign Spec) | **0.0700** | 108.9 ms |
-| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **72.41%** (84/116) | **0.7707 AUROC** (**96.4%** Benign Spec, **50.0%** Recall) | 0.2595 | 74.6 ms |"""
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **71.55%–72.41%** (83–84/116) | **0.7902 AUROC** (**96.4%** Benign Spec, **48.3%–50.0%** Recall) | 0.2478 | 106.5 ms |"""
     elif is_qwen4b:
         benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
 

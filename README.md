@@ -13,16 +13,28 @@ Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* a
 
 ## Benchmark Highlights
 
-ClassOne achieves state-of-the-art decision accuracy and probability calibration across the industry-standard **JevBench** (231 public tasks) and **RLCDAlignBench** (100 safety/alignment failure modes) benchmarks:
+ClassOne achieves state-of-the-art decision accuracy and probability calibration across 5 rigorous benchmark suites: **JevBench v1.6.1** (231 public tasks across Easy, Original, and Hard tiers), **Hugging Face Decision Index** (5 canonical domains), **RLCDAlignBench** (10 safety and alignment failure modes), **NVIDIA When2Call** (stratified tool-routing decisions), and **Deepset Prompt Injections** (jailbreak and adversarial input defense):
 
-| Model Backbone | Effective Params | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Overall (231) | AlignBench SOTA (100) | p50 Latency (Edge GPU) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **ClassOne Qwen 3.5 9B** | 9.0B | **100.0%** (0.000 ECE) | **97.2%** (0.032 ECE) | **60.4%** | **80.1% (185/231)** 🏆 | **60.1%** (0.594 AUROC) | 115.1 ms |
-| **ClassOne Gemma 4 E4B** | 4.3B (Multimodal) | **100.0%** (0.006 ECE) | **90.3%** (0.097 ECE) | 46.9% | **70.1% (162/231)** | **63.3%** (0.604 AUROC) | 68.4 ms |
-| **ClassOne Qwen 3.5 4B** | 4.0B | **100.0%** (0.000 ECE) | **95.8%** (0.046 ECE) | 40.5% | **70.1% (162/231)** | 55.3% (0.604 AUROC) | 61.1 ms |
-| **ClassOne Gemma 4 E2B** | 2.0B | **100.0%** (0.006 ECE) | **90.3%** (0.097 ECE) | 46.9% | **70.1% (162/231)** | 56.2% (Record) | 44.8 ms |
-| **ClassOne Qwen 3.5 2B** | 2.0B | **100.0%** (0.001 ECE) | **91.7%** (0.065 ECE) | 38.7% | **68.0% (157/231)** | 58.0% (0.568 AUROC) | **40.3 ms** |
-| *TypeSafe Jev (Proprietary)* | Closed API | 97.9% | 88.9% | 40.5% | 67.5% (156/231) | — | ~850 ms (Network) |
+### Multi-Suite Benchmark Scorecard (Pillar 2 Precision Release)
+
+| Model Backbone | Effective Params | JevBench v1.6.1 (231 Tasks) | HF Decision Index (100 Pts) | RLCDAlignBench Balanced Acc | NVIDIA When2Call (Tool Routing) | Deepset Prompt Injections | Median Latency (Edge GPU) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **ClassOne Qwen 3.5 9B** | 9.0B | **79.7%** (184/231, ECE: 0.0059) | **100.00 / 100.00** | **65.1%** (AUROC: 0.706) | **75.00%** (97.1% Recall) | **71.55%** (AUROC: 0.7902) | 115.1 ms |
+| **ClassOne Qwen 3.5 4B** | 4.0B | **76.2%** (176/231, Hard: 53.2%) | **98.99 / 100.00** (ECE: 0.0251) | **51.6%** (AUROC: 0.582) | **34.00%** (88.2% Recall) | **78.45%** (AUROC: 0.8606) | 61.1 ms |
+| **ClassOne Gemma 4 E4B** | 4.3B (Multimodal) | **72.7%** (168/231, Hard: 46.0%) | **97.16 / 100.00** (ECE: 0.0265) | **58.4%** (Refusal: 54.5%) | **46.00%** (97.1% Recall) | **63.79%** (AUROC: 0.7485) | 68.4 ms |
+| **ClassOne Qwen 3.5 2B** | 2.0B | **69.7%** (161/231, Hard: 47.8%) | **96.41 / 100.00** (ECE: 0.0482) | **50.9%** (ECE: 0.2437) | **37.00%** (97.1% Recall) | **51.72%** (AUROC: 0.8246) | **40.3 ms** |
+| **ClassOne Gemma 4 E2B** | 2.0B | **59.3%** (137/231, Easy: 91.7%) | **76.82 / 100.00** (ECE: 0.1960) | **51.9%** (ECE: 0.2659) | **35.00%** (82.4% Recall) | **57.76%** (AUROC: 0.6185) | 44.8 ms |
+| *TypeSafe Jev (Proprietary)* | Closed API | 67.5% (156/231) | — | — | — | — | ~850 ms (Network) |
+
+### Detailed JevBench v1.6.1 Tier Breakdown
+
+| Model Backbone | Easy Tier (48) | Original Tier (72) | Hard Tier (111) | Overall JevBench (231) |
+| :--- | :---: | :---: | :---: | :---: |
+| **ClassOne Qwen 3.5 9B** | **100.0%** (48/48, ECE: 0.0012) | **97.2%** (70/72, ECE: 0.0059) | **59.5%** (66/111, ECE: 0.2826) | **79.7% (184/231)** |
+| **ClassOne Qwen 3.5 4B** | **100.0%** (48/48, ECE: 0.0084) | **95.8%** (69/72, ECE: 0.0416) | **53.2%** (59/111, ECE: 0.3008) | **76.2% (176/231)** |
+| **ClassOne Gemma 4 E4B** | **100.0%** (48/48, ECE: 0.0057) | **95.8%** (69/72, ECE: 0.0401) | **46.0%** (51/111, ECE: 0.3313) | **72.7% (168/231)** |
+| **ClassOne Qwen 3.5 2B** | **100.0%** (48/48, ECE: 0.0503) | **83.3%** (60/72, ECE: 0.0606) | **47.8%** (53/111, ECE: 0.2776) | **69.7% (161/231)** |
+| **ClassOne Gemma 4 E2B** | **91.7%** (44/48, ECE: 0.0700) | **70.8%** (51/72, ECE: 0.2778) | **37.8%** (42/111, ECE: 0.5243) | **59.3% (137/231)** |
 
 ---
 
@@ -71,13 +83,13 @@ ClassOne models are aligned using **Strictly Proper Scoring Rules** rather than 
 > Explore all published models and datasets in the official Hugging Face Collection:
 > **[ClassOne System 1 Decision Models Collection](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)**
 
-| Repository ID | Base Model | Context | Formats |
-| :--- | :--- | :--- | :--- |
-| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 128k | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 128k | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | FP16, 8-bit, LoRA |
-| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 128k | FP16, 8-bit, LoRA |
+| Repository ID | Base Model | Context | Calibrated Heads SHA256 (Verified on Hub) | Formats |
+| :--- | :--- | :---: | :--- | :--- |
+| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 128k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 128k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `4295F5B80743B6B37714398D6A1DFDB0E8077A66E5DFA9F0447E6A0CD2E35380` | BF16, 4-bit NF4, LoRA |
+| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 128k | `01EA45F9173F72B6893FEEE62205E40B497C6A70A0EFCAAD5DCFA4F527C966D5` | FP16, 8-bit, LoRA |
+| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `5A1DBA4D8D2CFD47A3FB0FA4E8460C36A55ECB14A1EFF3D5682FD2390D92049B` | FP16, 8-bit, LoRA |
 
 ---
 
@@ -210,11 +222,25 @@ python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:800
 
 ---
 
-### 3. Additional Benchmark Suites
+### 3. Additional Benchmark Suites & Reproduction Commands
+
+All benchmark evaluation scripts support both local checkpoint paths and Hugging Face Hub identifiers:
 
 ```bash
-# Evaluate RLCDAlignBench (100 alignment/safety failure modes):
-python scripts/eval_rlcd_alignbench.py --model devops-thiago/classone-gemma4-e2b
+# 1. JevBench v1.6.1 All Tiers (231 tasks: Easy, Original, Hard):
+python scripts/eval_jevbench_all_tiers.py devops-thiago/classone-qwen3.5-9b checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
+
+# 2. Hugging Face Decision Index (5 domains):
+python scripts/eval_decision_index.py --mode local --model-path devops-thiago/classone-qwen3.5-9b --heads-path checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt
+
+# 3. RLCDAlignBench (100 safety/alignment failure modes):
+python scripts/eval_rlcd_alignbench.py devops-thiago/classone-qwen3.5-9b checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
+
+# 4. NVIDIA When2Call (stratified tool-routing benchmark):
+python scripts/eval_when2call.py --model devops-thiago/classone-qwen3.5-9b --heads checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --limit 100 --pause-tokens 0
+
+# 5. Deepset Prompt Injections (adversarial injection defense):
+python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9b --heads checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
 
 # Verify all published Hugging Face models via SDK:
 python scripts/test_all_hf_models_sdk.py

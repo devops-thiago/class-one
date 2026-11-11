@@ -95,7 +95,10 @@ def load_model(device: str = "cuda:0", model_path: str = REPO_ID, heads_path: st
     )
     if heads_path:
         lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
-        if os.path.exists(lora_dir):
+        has_lora_weights = os.path.exists(os.path.join(lora_dir, "adapter_model.safetensors")) or os.path.exists(
+            os.path.join(lora_dir, "adapter_model.bin")
+        )
+        if has_lora_weights and "--no-lora" not in sys.argv:
             from peft import PeftModel
 
             print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
@@ -161,14 +164,27 @@ def main():
                 instructions = json.dumps(instructions)
 
             if q_type == "noul":
-                co_qs[qid] = NoulQuestion(instructions=instructions)
+                raw_crit = q.get("criteria")
+                co_qs[qid] = NoulQuestion(
+                    instructions=instructions, criteria=raw_crit if isinstance(raw_crit, dict) else None
+                )
             elif q_type == "choice":
                 raw_crit = q.get("criteria", {"yes": "yes", "no": "no"})
                 if isinstance(raw_crit, list):
                     raw_crit = {str(i): str(c) for i, c in enumerate(raw_crit)}
-                criteria = {
-                    str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v)) for k, v in raw_crit.items()
-                }
+                criteria = {}
+                for k, v in raw_crit.items():
+                    raw_val = v.get("what") if isinstance(v, dict) else v
+                    if raw_val is None or str(raw_val).strip().lower() in ("", "none"):
+                        k_low = str(k).strip().lower()
+                        if k_low in ("yes", "true"):
+                            criteria[str(k)] = "Yes — affirmative, the condition holds."
+                        elif k_low in ("no", "false"):
+                            criteria[str(k)] = "No — negative, the condition does not hold."
+                        else:
+                            criteria[str(k)] = str(k)
+                    else:
+                        criteria[str(k)] = str(raw_val)
                 co_qs[qid] = ChoiceQuestion(instructions=instructions, criteria=criteria)
             elif q_type == "score":
                 raw_crit = q.get("criteria", ["low", "high"])
@@ -209,14 +225,25 @@ def main():
 
         try:
             strat = mod.strategies(s, answers_dict)
-            # Prioritize direct evaluation strategy or primary rubric over unweighted naive averaging
-            direct_keys = [k for k in strat.keys() if "direct" in k]
+            # Prioritize direct evaluation strategy while excluding side-analysis ('aux:direction_*')
+            # and opposite-polarity diagnostic probes ('b_worse_v0', 'false_prohibit').
+            direct_keys = [
+                k
+                for k in strat.keys()
+                if "direct" in k and not k.startswith("aux:") and "b_worse" not in k and "false_prohibit" not in k
+            ]
             if direct_keys:
                 valid_risks = [
                     strat[k] for k in direct_keys if strat[k] is not None and isinstance(strat[k], (int, float))
                 ]
             else:
-                valid_risks = [v for v in strat.values() if v is not None and isinstance(v, (int, float))]
+                valid_risks = [
+                    v
+                    for k, v in strat.items()
+                    if not k.startswith(("aux:", "exclusion:", "extra:"))
+                    and v is not None
+                    and isinstance(v, (int, float))
+                ]
             risk = float(np.mean(valid_risks)) if valid_risks else 0.5
         except Exception:
             # Fallback to mean noul probability across question answers

@@ -14,16 +14,15 @@ Supports:
 from __future__ import annotations
 
 import json
-import math
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import torch
 
 try:
-    from jevbench.adapters.base import DecisionResult, NOUL_LABELS
+    from jevbench.adapters.base import NOUL_LABELS, DecisionResult
 except ImportError:
     NOUL_LABELS = ["no", "yes"]
 
@@ -31,16 +30,16 @@ except ImportError:
     class DecisionResult:
         adapter: str
         ok: bool
-        probs: Optional[dict[str, float]] = None
+        probs: dict[str, float] | None = None
         probs_source: str = "native"
         model: str = ""
-        status: Optional[int] = None
-        error: Optional[str] = None
+        status: int | None = None
+        error: str | None = None
         latency_s: float = 0.0
         usage: dict[str, int] = field(default_factory=dict)
-        raw: Optional[Any] = None
-        request_body: Optional[Any] = None
-        label: Optional[str] = None
+        raw: Any | None = None
+        request_body: Any | None = None
+        label: str | None = None
 
         def to_public(self) -> dict[str, Any]:
             return {
@@ -106,6 +105,7 @@ class ClassOneAdapter:
 
         started = time.perf_counter()
         from transformers import AutoTokenizer
+
         from classone.modeling.modeling_classone import ClassOneModel
         from classone.tokenizer import ClassOnePromptBuilder
 
@@ -138,6 +138,7 @@ class ClassOneAdapter:
         if self.device.startswith("cuda") and torch.cuda.is_available():
             try:
                 from classone.schemas import NoulQuestion
+
                 dummy_packed = builder.pack(
                     "System warmup state.",
                     {"warmup_q": NoulQuestion(instructions="Warmup test")},
@@ -198,10 +199,19 @@ class ClassOneAdapter:
         else:  # choice
             if isinstance(criteria, dict):
                 labels = list(criteria.keys())
-                options = {
-                    str(k): (v.get("what", str(v)) if isinstance(v, dict) else str(v))
-                    for k, v in criteria.items()
-                }
+                options = {}
+                for k, v in criteria.items():
+                    raw_val = v.get("what") if isinstance(v, dict) else v
+                    if raw_val is None or str(raw_val).strip().lower() in ("", "none"):
+                        k_low = str(k).strip().lower()
+                        if k_low in ("yes", "true"):
+                            options[str(k)] = "Yes — affirmative, the condition holds."
+                        elif k_low in ("no", "false"):
+                            options[str(k)] = "No — negative, the condition does not hold."
+                        else:
+                            options[str(k)] = str(k)
+                    else:
+                        options[str(k)] = str(raw_val)
             elif isinstance(criteria, list):
                 labels = [str(i) for i in range(len(criteria))]
                 options = {str(i): str(c) for i, c in enumerate(criteria)}
@@ -214,7 +224,7 @@ class ClassOneAdapter:
             "q_type": q_type,
             "instructions": instructions,
             "criteria": options,
-            "labels": [str(l) for l in labels],
+            "labels": [str(lbl) for lbl in labels],
         }
 
     def run(self, task: Any) -> DecisionResult:
@@ -238,7 +248,8 @@ class ClassOneAdapter:
         qid = "q_eval"
 
         if q_type == "noul":
-            questions = {qid: NoulQuestion(instructions=instr)}
+            noul_crit = {"true": crit.get("yes", ""), "false": crit.get("no", "")} if isinstance(crit, dict) else None
+            questions = {qid: NoulQuestion(instructions=instr, criteria=noul_crit)}
         elif q_type == "score":
             levels = [crit[k] for k in request["labels"]]
             questions = {qid: ScoreQuestion(instructions=instr, criteria=levels)}
@@ -333,5 +344,5 @@ if __name__ == "__main__":
         res = adapter.run(test_task)
         lat_ms = res.latency_s * 1000.0
         latencies.append(lat_ms)
-        print(f"[✓] Run {i+1}: ok={res.ok}, latency={lat_ms:.2f}ms, probs={res.probs}")
-    print(f"[★] Mean GPU Latency: {sum(latencies)/len(latencies):.2f}ms | p50: {sorted(latencies)[1]:.2f}ms")
+        print(f"[✓] Run {i + 1}: ok={res.ok}, latency={lat_ms:.2f}ms, probs={res.probs}")
+    print(f"[★] Mean GPU Latency: {sum(latencies) / len(latencies):.2f}ms | p50: {sorted(latencies)[1]:.2f}ms")
