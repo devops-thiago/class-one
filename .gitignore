@@ -48,5 +48,14 @@ scripts/test_all_hf_models_sdk.py
 
 # Local datasets and external tools
 data/*
+!data/.gitkeep
+!data/README.md
+
+# Local scratch & interactive demos
+chess/
+docs/chess_*.png
+scripts/*chess*.py
+scripts/test_forced_move.py
+scripts/test_live_battle_playwright.py
 !data/decision_index/
 tools/

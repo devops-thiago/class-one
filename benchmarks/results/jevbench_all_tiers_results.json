@@ -2,16 +2,16 @@
   {
     "tier": "Easy",
     "tasks": 48,
-    "correct": 48,
-    "accuracy": 100.0,
-    "ece": 0.0022,
-    "brier": 0.0,
-    "latency_p50_ms": 111.68,
-    "latency_mean_ms": 140.59,
-    "latency_p95_ms": 144.09,
+    "correct": 44,
+    "accuracy": 91.67,
+    "ece": 0.07,
+    "brier": 0.0675,
+    "latency_p50_ms": 47.61,
+    "latency_mean_ms": 71.96,
+    "latency_p95_ms": 51.54,
     "type_breakdown": {
       "noul": {
-        "correct": 12,
+        "correct": 8,
         "total": 12
       },
       "choice": {
@@ -27,24 +27,24 @@
   {
     "tier": "Original",
     "tasks": 72,
-    "correct": 70,
-    "accuracy": 97.22,
-    "ece": 0.0182,
-    "brier": 0.0182,
-    "latency_p50_ms": 110.4,
-    "latency_mean_ms": 108.9,
-    "latency_p95_ms": 142.89,
+    "correct": 51,
+    "accuracy": 70.83,
+    "ece": 0.2778,
+    "brier": 0.2635,
+    "latency_p50_ms": 46.16,
+    "latency_mean_ms": 46.27,
+    "latency_p95_ms": 52.86,
     "type_breakdown": {
       "noul": {
-        "correct": 23,
+        "correct": 12,
         "total": 24
       },
       "choice": {
-        "correct": 35,
+        "correct": 29,
         "total": 36
       },
       "score": {
-        "correct": 12,
+        "correct": 10,
         "total": 12
       }
     }
@@ -52,24 +52,24 @@
   {
     "tier": "Hard",
     "tasks": 111,
-    "correct": 64,
-    "accuracy": 57.66,
-    "ece": 0.2629,
-    "brier": 0.2983,
-    "latency_p50_ms": 318.82,
-    "latency_mean_ms": 635.04,
-    "latency_p95_ms": 1633.98,
+    "correct": 42,
+    "accuracy": 37.84,
+    "ece": 0.5243,
+    "brier": 0.5001,
+    "latency_p50_ms": 99.34,
+    "latency_mean_ms": 225.95,
+    "latency_p95_ms": 652.95,
     "type_breakdown": {
       "noul": {
-        "correct": 20,
+        "correct": 19,
         "total": 38
       },
       "choice": {
-        "correct": 40,
+        "correct": 23,
         "total": 67
       },
       "score": {
-        "correct": 4,
+        "correct": 0,
         "total": 6
       }
     }

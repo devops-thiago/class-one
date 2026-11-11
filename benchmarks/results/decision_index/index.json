@@ -7,16 +7,16 @@
   "license": "apache-2.0",
   "submission_date": "2026-11-10",
   "hardware_environment": "2x NVIDIA RTX 5060 Ti 16GB",
-  "overall_index": 100.0,
+  "overall_index": 76.82,
   "domain_scores": {
-    "knowledge": 100.0,
-    "language": 100.0,
-    "retrieval": 100.0,
-    "tools": 100.0,
-    "rubric": 100.0
+    "knowledge": 70.0,
+    "language": 90.0,
+    "retrieval": 60.0,
+    "tools": 90.0,
+    "rubric": 70.0
   },
   "metrics": {
-    "ece": 0.0147,
-    "latency_p50_ms": 142.28
+    "ece": 0.195,
+    "latency_p50_ms": 70.3
   }
 }

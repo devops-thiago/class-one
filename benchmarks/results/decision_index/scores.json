@@ -1,46 +1,46 @@
 {
   "benchmark": "Hugging Face Decision Index",
   "space": "multimodalart/jev-decision-index",
-  "timestamp": "2026-11-10 00:02:14Z",
+  "timestamp": "2026-11-10 18:13:27Z",
   "model_id": "devops-thiago/classone-qwen3.5-9b",
-  "overall_decision_index": 100.0,
-  "overall_ece": 0.0147,
-  "latency_p50_ms": 142.28,
-  "latency_p95_ms": 172.56,
+  "overall_decision_index": 76.82,
+  "overall_ece": 0.195,
+  "latency_p50_ms": 70.3,
+  "latency_p95_ms": 77.96,
   "radar_metrics": {
     "knowledge": {
       "name": "Knowledge & Verification",
-      "score": 100.0,
+      "score": 70.0,
       "weight": 0.258,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 70.0,
       "tasks": 10
     },
     "language": {
       "name": "Language & Policy Contracts",
-      "score": 100.0,
+      "score": 90.0,
       "weight": 0.258,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 90.0,
       "tasks": 10
     },
     "retrieval": {
       "name": "Retrieval & Relevance Triage",
-      "score": 100.0,
+      "score": 60.0,
       "weight": 0.2,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 60.0,
       "tasks": 10
     },
     "tools": {
       "name": "Tools & Execution Guardrails",
-      "score": 100.0,
+      "score": 90.0,
       "weight": 0.183,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 90.0,
       "tasks": 10
     },
     "rubric": {
       "name": "Rubric & Quality Scoring",
-      "score": 100.0,
+      "score": 70.0,
       "weight": 0.101,
-      "raw_accuracy": 100.0,
+      "raw_accuracy": 70.0,
       "tasks": 10
     }
   }

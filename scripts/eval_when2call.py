@@ -68,6 +68,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=100, help="Number of samples to evaluate (0 for full split).")
     parser.add_argument("--heads", type=str, default=None, help="Path to classone_heads.pt file (optional).")
     parser.add_argument("--pause-tokens", type=int, default=8, help="Number of latent pause tokens.")
+    parser.add_argument("--quant", type=str, default=None, help="Backbone quantization ('4bit', 'none').")
+    parser.add_argument("--no-quant", action="store_true", help="Disable 4-bit quantization (use native BF16/FP16).")
     parser.add_argument(
         "--output",
         type=str,
@@ -109,7 +111,14 @@ def main() -> None:
     builder = ClassOnePromptBuilder(tokenizer, default_pause_tokens=pause_cnt)
 
     is_large = any(k in args.model.lower() for k in ["e4b", "12b", "9b", "4b"])
-    quant = "4bit" if is_large and "cuda" in args.device else None
+    if args.no_quant or (args.quant and args.quant.lower() in ("none", "false", "no", "bf16", "fp16")):
+        quant = None
+    elif args.quant:
+        quant = args.quant
+    elif is_large and "cuda" in args.device:
+        quant = "4bit"
+    else:
+        quant = None
 
     print(f"[*] Loading model backbone from {args.model}...")
     model = ClassOneModel.from_backbone(

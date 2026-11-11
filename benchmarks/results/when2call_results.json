@@ -5,14 +5,14 @@
       "benchmark": "NVIDIA When2Call (mcq)",
       "model": "devops-thiago/classone-gemma4-e4b",
       "sample_count": 100,
-      "overall_accuracy_pct": 43.0,
-      "ece": 0.4017,
-      "latency_p50_ms": 305.31,
-      "latency_p95_ms": 718.18,
+      "overall_accuracy_pct": 46.0,
+      "ece": 0.2864,
+      "latency_p50_ms": 324.22,
+      "latency_p95_ms": 783.16,
       "per_class_accuracy_pct": {
-        "cannot_answer": 9.523809523809524,
+        "cannot_answer": 14.285714285714285,
         "request_for_info": 29.166666666666668,
-        "tool_call": 94.11764705882352
+        "tool_call": 97.05882352941177
       },
       "per_class_counts": {
         "cannot_answer": 42,
@@ -25,9 +25,9 @@
       "model": "devops-thiago/classone-qwen3.5-4b",
       "sample_count": 100,
       "overall_accuracy_pct": 33.0,
-      "ece": 0.5928,
-      "latency_p50_ms": 288.81,
-      "latency_p95_ms": 702.12,
+      "ece": 0.5519,
+      "latency_p50_ms": 225.12,
+      "latency_p95_ms": 572.04,
       "per_class_accuracy_pct": {
         "cannot_answer": 0.0,
         "request_for_info": 0.0,
@@ -44,9 +44,9 @@
       "model": "devops-thiago/classone-qwen3.5-9b",
       "sample_count": 100,
       "overall_accuracy_pct": 74.0,
-      "ece": 0.1257,
-      "latency_p50_ms": 374.69,
-      "latency_p95_ms": 867.84,
+      "ece": 0.1446,
+      "latency_p50_ms": 387.61,
+      "latency_p95_ms": 893.25,
       "per_class_accuracy_pct": {
         "cannot_answer": 54.761904761904766,
         "request_for_info": 79.16666666666666,
@@ -82,13 +82,70 @@
       "model": "devops-thiago/classone-gemma4-e2b",
       "sample_count": 100,
       "overall_accuracy_pct": 35.0,
-      "ece": 0.5376,
-      "latency_p50_ms": 106.79,
-      "latency_p95_ms": 266.96,
+      "ece": 0.5773,
+      "latency_p50_ms": 111.27,
+      "latency_p95_ms": 271.6,
       "per_class_accuracy_pct": {
-        "cannot_answer": 14.285714285714285,
+        "cannot_answer": 16.666666666666664,
         "request_for_info": 0.0,
-        "tool_call": 85.29411764705883
+        "tool_call": 82.35294117647058
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "Qwen/Qwen3.5-4B": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "Qwen/Qwen3.5-4B",
+      "sample_count": 100,
+      "overall_accuracy_pct": 34.0,
+      "ece": 0.4048,
+      "latency_p50_ms": 274.42,
+      "latency_p95_ms": 704.7,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 9.523809523809524,
+        "request_for_info": 0.0,
+        "tool_call": 88.23529411764706
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "Qwen/Qwen3.5-2B": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "Qwen/Qwen3.5-2B",
+      "sample_count": 100,
+      "overall_accuracy_pct": 37.0,
+      "ece": 0.3193,
+      "latency_p50_ms": 120.48,
+      "latency_p95_ms": 294.0,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 7.142857142857142,
+        "request_for_info": 4.166666666666666,
+        "tool_call": 97.05882352941177
+      },
+      "per_class_counts": {
+        "cannot_answer": 42,
+        "request_for_info": 24,
+        "tool_call": 34
+      }
+    },
+    "checkpoints/classone_composite_70pct_merged": {
+      "benchmark": "NVIDIA When2Call (mcq)",
+      "model": "checkpoints/classone_composite_70pct_merged",
+      "sample_count": 100,
+      "overall_accuracy_pct": 35.0,
+      "ece": 0.5634,
+      "latency_p50_ms": 116.79,
+      "latency_p95_ms": 282.79,
+      "per_class_accuracy_pct": {
+        "cannot_answer": 16.666666666666664,
+        "request_for_info": 0.0,
+        "tool_call": 82.35294117647058
       },
       "per_class_counts": {
         "cannot_answer": 42,

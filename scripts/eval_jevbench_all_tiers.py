@@ -67,7 +67,8 @@ def evaluate_tier(name: str, tasks: list[dict], model: ClassOneModel, builder: C
 
         # Build appropriate ClassOne question schema
         if q_type == "noul":
-            co_q = NoulQuestion(instructions=instructions)
+            raw_crit = q_data.get("criteria")
+            co_q = NoulQuestion(instructions=instructions, criteria=raw_crit if isinstance(raw_crit, dict) else None)
         elif q_type == "choice":
             raw_crit = q_data.get("criteria", {})
             if isinstance(raw_crit, list):
@@ -189,7 +190,11 @@ def main():
 
     print(f"[*] Loading {model_path} on {device} (heads from {heads_path})...")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    builder = ClassOnePromptBuilder(tokenizer)
+    pause_tokens = 0
+    for i, a in enumerate(sys.argv):
+        if a == "--pause-tokens" and i + 1 < len(sys.argv):
+            pause_tokens = int(sys.argv[i + 1])
+    builder = ClassOnePromptBuilder(tokenizer, default_pause_tokens=pause_tokens)
 
     no_quant = "--no-quant" in sys.argv or "--unquantized" in sys.argv or "--fp16" in sys.argv or "--bf16" in sys.argv
     is_large = any(k in model_path.lower() for k in ["e4b", "12b", "9b", "4b"]) or "--4bit" in sys.argv
@@ -203,7 +208,10 @@ def main():
         quantization=quant,
     )
     lora_dir = os.path.join(os.path.dirname(heads_path), "lora_backbone")
-    if os.path.exists(os.path.join(lora_dir, "adapter_config.json")) and "--no-lora" not in sys.argv:
+    has_lora_weights = os.path.exists(os.path.join(lora_dir, "adapter_model.safetensors")) or os.path.exists(
+        os.path.join(lora_dir, "adapter_model.bin")
+    )
+    if has_lora_weights and "--no-lora" not in sys.argv:
         from peft import PeftModel
 
         print(f"[*] Attaching local LoRA adapter from {lora_dir}...")
