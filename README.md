@@ -11,30 +11,46 @@ Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* a
 
 ---
 
-## Benchmark Highlights
+## Benchmark Results
 
-ClassOne achieves state-of-the-art decision accuracy and probability calibration across 5 rigorous benchmark suites: **JevBench v1.6.1** (231 public tasks across Easy, Original, and Hard tiers), **Hugging Face Decision Index** (5 canonical domains), **RLCDAlignBench** (10 safety and alignment failure modes), **NVIDIA When2Call** (stratified tool-routing decisions), and **Deepset Prompt Injections** (jailbreak and adversarial input defense):
+### Official Third-Party Evaluation (Benchmark Heaven)
 
-### Multi-Suite Benchmark Scorecard (Pillar 2 Precision Release)
+Independent third-party evaluation is hosted on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`):
 
-| Model Backbone | Effective Params | JevBench v1.6.1 (231 Tasks) | HF Decision Index (100 Pts) | RLCDAlignBench Balanced Acc | NVIDIA When2Call (Tool Routing) | Deepset Prompt Injections | Median Latency (Edge GPU) |
+| Model | Composite Score | Intelligence | Calibration | Capability | Source |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **`classone-qwen3.5-9b`** | **43.0** (Rank **#113**) | **42.2** | **58.7** | **50.5** (**#155** of 217 open-weights) | [`benchmarkheaven.com/jev-models/classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) |
+
+**Why official Benchmark Heaven scores differ from local self-measurements below:**
+- **Sealed vs. public tasks:** Local scripts evaluate only the **231 public JevBench tasks**; Benchmark Heaven additionally runs private **sealed items**.
+- **Public/sealed gap penalty & 10 s cutoff:** Benchmark Heaven penalizes divergence between public and sealed performance and zeroes tasks exceeding 10 seconds.
+- **Hardware normalization:** Official speed and cost metrics run on standardized server GPUs rather than local workstation GPUs (`2x NVIDIA RTX 5060 Ti 16 GB`).
+
+### Self-Measured Multi-Suite Scorecard
+
+> **Provenance:** Executed locally in standalone mode (`--no-lora --pause-tokens 0`, unquantized BF16/FP16 unless noted) on **`2x NVIDIA RTX 5060 Ti 16 GB`** (Date: `2026-11-13`, branch `feat/pillar3a-alignment-and-tool-routing`).
+
+| Model Backbone | Effective Params | JevBench v1.6.1 (231 Public Tasks) | Decision Index Suite (Self-Run, 100 Pts) | RLCDAlignBench Balanced Acc | NVIDIA When2Call (Tool Routing) | Deepset Prompt Injections | Median Latency (Edge GPU) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **ClassOne Qwen 3.5 9B** | 9.0B | **79.7%** (184/231, ECE: 0.0059) | **100.00 / 100.00** | **65.1%** (AUROC: 0.706) | **75.00%** (97.1% Recall) | **71.55%** (AUROC: 0.7902) | 115.1 ms |
-| **ClassOne Qwen 3.5 4B** | 4.0B | **76.2%** (176/231, Hard: 53.2%) | **98.99 / 100.00** (ECE: 0.0251) | **51.6%** (AUROC: 0.582) | **34.00%** (88.2% Recall) | **78.45%** (AUROC: 0.8606) | 61.1 ms |
-| **ClassOne Gemma 4 E4B** | 4.3B (Multimodal) | **72.7%** (168/231, Hard: 46.0%) | **97.16 / 100.00** (ECE: 0.0265) | **58.4%** (Refusal: 54.5%) | **46.00%** (97.1% Recall) | **63.79%** (AUROC: 0.7485) | 68.4 ms |
-| **ClassOne Qwen 3.5 2B** | 2.0B | **69.7%** (161/231, Hard: 47.8%) | **96.41 / 100.00** (ECE: 0.0482) | **50.9%** (ECE: 0.2437) | **37.00%** (97.1% Recall) | **51.72%** (AUROC: 0.8246) | **40.3 ms** |
-| **ClassOne Gemma 4 E2B** | 2.0B | **59.3%** (137/231, Easy: 91.7%) | **76.82 / 100.00** (ECE: 0.1960) | **51.9%** (ECE: 0.2659) | **35.00%** (82.4% Recall) | **57.76%** (AUROC: 0.6185) | 44.8 ms |
-| *TypeSafe Jev (Proprietary)* | Closed API | 67.5% (156/231) | — | — | — | — | ~850 ms (Network) |
+| **ClassOne Qwen 3.5 9B** | 9.0B | **79.7%** (184/231, ECE: 0.0059) | **100.00 / 100.00** | **65.1%** (AUROC: 0.623) | **75.00%** (97.1% `tool_call`) | **71.55%** (AUROC: 0.7902) | 112.8 ms |
+| **ClassOne Qwen 3.5 4B** | 4.0B | **75.8%** (175/231, Hard: 52.3%) | **98.99 / 100.00** (ECE: 0.0333) | **51.5%** (AUROC: 0.572) | **35.00%** (88.2% `tool_call`) | **57.76%** (AUROC: 0.7619) | 157.1 ms |
+| **ClassOne Gemma 4 E4B** | 4.3B (Multimodal) | **73.2%** (169/231, Hard: 45.9%) | **98.99 / 100.00** (ECE: 0.0379) | **59.4%** (AUROC: 0.601) | **79.00%** (87.5% `req_info`) | **83.62%** (AUROC: 0.9430) | 97.1 ms |
+| **ClassOne Qwen 3.5 2B** | 2.0B | **69.7%** (161/231, Hard: 47.7%) | **94.58 / 100.00** (ECE: 0.0561) | **50.9%** (AUROC: 0.520) | **36.00%** (94.1% `tool_call`) | **51.72%** (AUROC: 0.8232) | 108.8 ms |
+| **ClassOne Gemma 4 E2B**\* | 2.0B | **69.3%** (160/231, Hard: 45.9%) | — | **56.2%** (Oct 6 snapshot) | **35.00%** (Oct 6 baseline) | **50.86%** (Oct 6 baseline) | 44.8 ms |
 
-### Detailed JevBench v1.6.1 Tier Breakdown
+\* *ClassOne Gemma 4 E2B (`F6A6E423...` rolled-back heads) scores **69.3%** (`160/231`) with its native serialized custom delimiter tokens (`<|state_start|>=262144..262155`). Because SDK `v0.2.0–v0.2.3` (`commit 86988ca`) prioritizes Gemma 4 `<unused0>..` reserved tokens when present, default `v0.2.0–v0.2.3` formatting evaluates E2B at **58.4%** (`135/231`).*
 
-| Model Backbone | Easy Tier (48) | Original Tier (72) | Hard Tier (111) | Overall JevBench (231) |
+### Self-Measured JevBench v1.6.1 Public Tier Breakdown
+
+> **Provenance:** Executed locally on **`2x NVIDIA RTX 5060 Ti 16 GB`** (Date: `2026-11-13`).
+
+| Model Backbone | Easy Tier (48) | Original Tier (72) | Hard Tier (111) | Overall Public (231) |
 | :--- | :---: | :---: | :---: | :---: |
-| **ClassOne Qwen 3.5 9B** | **100.0%** (48/48, ECE: 0.0012) | **97.2%** (70/72, ECE: 0.0059) | **59.5%** (66/111, ECE: 0.2826) | **79.7% (184/231)** |
-| **ClassOne Qwen 3.5 4B** | **100.0%** (48/48, ECE: 0.0084) | **95.8%** (69/72, ECE: 0.0416) | **53.2%** (59/111, ECE: 0.3008) | **76.2% (176/231)** |
-| **ClassOne Gemma 4 E4B** | **100.0%** (48/48, ECE: 0.0057) | **95.8%** (69/72, ECE: 0.0401) | **46.0%** (51/111, ECE: 0.3313) | **72.7% (168/231)** |
-| **ClassOne Qwen 3.5 2B** | **100.0%** (48/48, ECE: 0.0503) | **83.3%** (60/72, ECE: 0.0606) | **47.8%** (53/111, ECE: 0.2776) | **69.7% (161/231)** |
-| **ClassOne Gemma 4 E2B** | **91.7%** (44/48, ECE: 0.0700) | **70.8%** (51/72, ECE: 0.2778) | **37.8%** (42/111, ECE: 0.5243) | **59.3% (137/231)** |
+| **ClassOne Qwen 3.5 9B** | **100.0%** (48/48, ECE: 0.0029–0.0031) | **97.2%** (70/72, ECE: 0.0057–0.0059) | **59.5%** (66/111, ECE: 0.2537) | **79.7% (184/231)** |
+| **ClassOne Qwen 3.5 4B** | **100.0%** (48/48, ECE: 0.0266) | **95.8%** (69/72, ECE: 0.0385) | **52.3%** (58/111, ECE: 0.3177) | **75.8% (175/231)** |
+| **ClassOne Gemma 4 E4B** | **100.0%** (48/48, ECE: 0.0022) | **97.2%** (70/72, ECE: 0.0209) | **45.9%** (51/111, ECE: 0.3637) | **73.2% (169/231)** |
+| **ClassOne Qwen 3.5 2B** | **100.0%** (48/48, ECE: 0.0500) | **83.3%** (60/72, ECE: 0.0579) | **47.7%** (53/111, ECE: 0.2761) | **69.7% (161/231)** |
+| **ClassOne Gemma 4 E2B** (Native tokens) | **93.8%** (45/48) | **88.9%** (64/72) | **45.9%** (51/111) | **69.3% (160/231)** |
 
 ---
 
@@ -85,11 +101,11 @@ ClassOne models are aligned using **Strictly Proper Scoring Rules** rather than 
 
 | Repository ID | Base Model | Context | Calibrated Heads SHA256 (Verified on Hub) | Formats |
 | :--- | :--- | :---: | :--- | :--- |
-| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 128k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 128k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `4295F5B80743B6B37714398D6A1DFDB0E8077A66E5DFA9F0447E6A0CD2E35380` | BF16, 4-bit NF4, LoRA |
-| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 128k | `01EA45F9173F72B6893FEEE62205E40B497C6A70A0EFCAAD5DCFA4F527C966D5` | FP16, 8-bit, LoRA |
-| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `5A1DBA4D8D2CFD47A3FB0FA4E8460C36A55ECB14A1EFF3D5682FD2390D92049B` | FP16, 8-bit, LoRA |
+| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 256k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 256k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `8F7157F4D67D21698F94A3DF69B8492F4CC592DAC65E91AC47A83FD2E083AFDC` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 256k | `BD24D8639DB9054CD9E0869E8DD2CF432D0B9A63AC82C557186A95D371E255F6` | FP16/BF16 Standalone, 8-bit |
+| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `F6A6E42365158D99807B8995C800429A0BD2B12755EDC1DEC5823400D35F337D` | FP16/BF16 Standalone, 8-bit |
 
 ---
 
@@ -172,9 +188,9 @@ python scripts/benchmark_docker_cpu.py --url http://localhost:8000 --concurrency
 
 ## Evaluation & Benchmark Reproduction
 
-### 1. Official JevBench v1.6.1 Benchmark (4-Axis Harmonic Mean)
+### 1. Self-Run JevBench v1.6.1 Reproduction (Public Tasks)
 
-Evaluates chance-corrected Intelligence (equal type weighting across Choice, Noul, Score), multi-bin Expected Calibration Error, Speed (logarithmic latency scoring), and Cost (tariff per 1,000 decisions):
+Evaluates chance-corrected Intelligence (equal type weighting across Choice, Noul, Score), multi-bin Expected Calibration Error, Speed, and local cost estimation across the 231 public JevBench tasks:
 
 ```bash
 # Evaluate Qwen 3.5 9B locally on GPU:
@@ -184,11 +200,11 @@ python scripts/eval_jevbench_v16.py --mode local
 python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Official JevBench v1.6.1 Scorecard (ClassOne Qwen 3.5 9B):**
+**Self-Measured Public 4-Axis Scorecard (`2x NVIDIA RTX 5060 Ti 16 GB`, ClassOne Qwen 3.5 9B):**
 
 | Axis | Weight | Score (0–100) | Metric Details |
 | :--- | :---: | :---: | :--- |
-| **Composite Score** | **100%** | **73.48** 🏆 | Equal-weight 4-axis Harmonic Mean |
+| **Composite Score (Self-Run)** | **100%** | **73.48** | Equal-weight 4-axis Harmonic Mean (see Benchmark Heaven above for official `v1.8.8` scores) |
 | **Capability Score** | — | **75.85** | Harmonic Mean of Intelligence & Calibration |
 | **Axis 1: Intelligence** | 25% | **81.38** | Choice: 85.07 \| Noul: 84.07 \| Score: 75.00 |
 | **Axis 2: Calibration** | 25% | **71.02** | ECE: 0.1549 \| Brier: 0.1596 |
@@ -199,9 +215,9 @@ python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/
 
 ---
 
-### 2. Hugging Face Decision Index (`multimodalart/jev-decision-index`)
+### 2. Decision Index Evaluation Suite (`multimodalart/jev-decision-index`)
 
-Evaluates decision quality across all 5 canonical capability domains and generates official submission manifests (`scores.json` and `index.json`):
+Self-run evaluation across all 5 capability domains using the public Decision Index task set (`scores.json` and `index.json` generated locally):
 
 ```bash
 # Evaluate Qwen 3.5 9B locally on GPU:
@@ -211,16 +227,16 @@ python scripts/eval_decision_index.py --mode local
 python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Official Decision Index Results (ClassOne Qwen 3.5 9B):**
+**Self-Measured Decision Index Suite Results (`2x NVIDIA RTX 5060 Ti 16 GB`, ClassOne Qwen 3.5 9B):**
 
-| Capability Domain | Official Weight | Domain Score | Raw Accuracy |
+| Capability Domain | Domain Weight | Domain Score | Raw Accuracy |
 | :--- | :---: | :---: | :---: |
 | **Knowledge & Verification** | 25.8% | **100.00** | 100.0% (10/10) |
 | **Language & Policy Contracts** | 25.8% | **100.00** | 100.0% (10/10) |
 | **Retrieval & Relevance Triage** | 20.0% | **100.00** | 100.0% (10/10) |
 | **Tools & Execution Guardrails** | 18.3% | **100.00** | 100.0% (10/10) |
 | **Rubric & Quality Scoring** | 10.1% | **100.00** | 100.0% (10/10) |
-| **Overall Decision Index** | **100.0%** | **100.00** 🏆 | **Overall ECE: 0.0051** |
+| **Overall Suite Score (Self-Run)** | **100.0%** | **100.00** | **Overall ECE: 0.0051** |
 
 ---
 
@@ -230,19 +246,19 @@ All benchmark evaluation scripts support both local checkpoint paths and Hugging
 
 ```bash
 # 1. JevBench v1.6.1 All Tiers (231 tasks: Easy, Original, Hard):
-python scripts/eval_jevbench_all_tiers.py devops-thiago/classone-qwen3.5-9b checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
+python scripts/eval_jevbench_all_tiers.py devops-thiago/classone-qwen3.5-9b --no-lora --pause-tokens 0
 
-# 2. Hugging Face Decision Index (5 domains):
-python scripts/eval_decision_index.py --mode local --model-path devops-thiago/classone-qwen3.5-9b --heads-path checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt
+# 2. Decision Index Suite (5 domains, local GPU):
+python scripts/eval_decision_index.py --mode local --model-path devops-thiago/classone-qwen3.5-9b --quant none
 
 # 3. RLCDAlignBench (100 safety/alignment failure modes):
-python scripts/eval_rlcd_alignbench.py devops-thiago/classone-qwen3.5-9b checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
+python scripts/eval_rlcd_alignbench.py devops-thiago/classone-qwen3.5-9b --no-lora --pause-tokens 0
 
 # 4. NVIDIA When2Call (stratified tool-routing benchmark):
-python scripts/eval_when2call.py --model devops-thiago/classone-qwen3.5-9b --heads checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --limit 100 --pause-tokens 0
+python scripts/eval_when2call.py --model devops-thiago/classone-qwen3.5-9b --limit 100 --pause-tokens 0
 
 # 5. Deepset Prompt Injections (adversarial injection defense):
-python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9b --heads checkpoints/snapshots/best_qwen9b_pillar2_65pct_alignbench/classone_heads.pt --pause-tokens 0
+python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9b --pause-tokens 0
 
 # Verify all published Hugging Face models via SDK:
 python scripts/test_all_hf_models_sdk.py
