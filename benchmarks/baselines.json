@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "hardware": "2x NVIDIA RTX 5060 Ti 16 GB",
+  "eval_date": "2026-11-13",
+  "eval_commit": "c375207",
+  "official_benchmark": {
+    "provider": "Benchmark Heaven",
+    "url": "https://benchmarkheaven.com/jev-models",
+    "version": "v1.8.8",
+    "checked_date": "2026-11-13"
+  },
+  "models": {
+    "devops-thiago/classone-qwen3.5-9b": {
+      "base_model": "Qwen/Qwen3.5-9B",
+      "heads_sha256": "68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141",
+      "official_model_url": "https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b",
+      "floors": {
+        "jevbench_public_acc": 0.797,
+        "decision_index_score": 100.0,
+        "rlcd_alignbench_bal_acc": 0.651
+      }
+    },
+    "devops-thiago/classone-qwen3.5-4b": {
+      "base_model": "Qwen/Qwen3.5-4B",
+      "heads_sha256": "654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66",
+      "floors": {
+        "jevbench_public_acc": 0.758,
+        "decision_index_score": 98.99,
+        "rlcd_alignbench_bal_acc": 0.515
+      }
+    },
+    "devops-thiago/classone-gemma4-e4b": {
+      "base_model": "google/gemma-4-E4B-it",
+      "heads_sha256": "8F7157F4D67D21698F94A3DF69B8492F4CC592DAC65E91AC47A83FD2E083AFDC",
+      "floors": {
+        "jevbench_public_acc": 0.732,
+        "decision_index_score": 98.99,
+        "rlcd_alignbench_bal_acc": 0.594
+      }
+    },
+    "devops-thiago/classone-qwen3.5-2b": {
+      "base_model": "Qwen/Qwen3.5-2B",
+      "heads_sha256": "BD24D8639DB9054CD9E0869E8DD2CF432D0B9A63AC82C557186A95D371E255F6",
+      "floors": {
+        "jevbench_public_acc": 0.697,
+        "decision_index_score": 94.58,
+        "rlcd_alignbench_bal_acc": 0.509
+      }
+    },
+    "devops-thiago/classone-gemma4-e2b": {
+      "base_model": "google/gemma-4-e2b-it",
+      "heads_sha256": "F6A6E42365158D99807B8995C800429A0BD2B12755EDC1DEC5823400D35F337D",
+      "floors": {
+        "jevbench_public_acc": 0.693,
+        "rlcd_alignbench_bal_acc": 0.562
+      }
+    }
+  }
+}
+

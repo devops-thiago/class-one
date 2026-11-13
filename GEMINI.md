@@ -24,6 +24,7 @@
 
 ## Quantization, GGUF & Publishing Standards
 - **Publishing Standard:** Quantized GGUF models are deprecated / outdated. Push ONLY the unquantized model (safetensors shards + calibrated `classone_heads.pt` + tokenizer + config) to Hugging Face Hub.
+- **Benchmark Attribution & Non-Regression Gate:** Never push weights/heads below `benchmarks/baselines.json` floors (use `--eval-report` with `scripts/push_to_hub.py`). Every self-measured benchmark table in `README.md`, `docs/`, and HF model cards must state `2x NVIDIA RTX 5060 Ti 16 GB`, date, and commit SHA, include official Benchmark Heaven results/links (`https://benchmarkheaven.com/jev-models`) with sealed vs. public explanation, and avoid unverified rank claims or `"HF Decision Index"` phrasing.
 - **Official Repository:** Always use `https://github.com/ggml-org/llama.cpp` (NOT `ggerganov/llama.cpp`).
 - **Gemma 4 GGUF Conversion:** In `convert_hf_to_gguf.py`, register `Gemma4Model` architecture and prepend `model.` to tensors that lack the prefix.
 - **GGUF Performance:** On RTX 5060 Ti CUDA, `Q4_K_M` achieves 5,322 t/s prompt ingestion (3.15 GiB VRAM), and `Q8_0` achieves 4,361 t/s (4.58 GiB VRAM).
