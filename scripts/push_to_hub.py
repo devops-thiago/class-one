@@ -341,9 +341,9 @@ print("Anger score:   ", results["anger"].score)
     if is_qwen9b:
         official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([model page: `classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`, checked `{eval_date}`):
+Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([model page: `classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`, checked `{eval_date}`):
 
-| Metric | Official Benchmark Heaven (`v1.8.8`) |
+| Metric | Official Benchmark Heaven (JevBench `v1.8.10`) |
 |---|---|
 | **Composite Score** | **43.0** (Composite rank **#131**) |
 | **Intelligence** | **42.2** |
@@ -415,7 +415,7 @@ Self-measured across the 10 alignment failure modes in [RLCDAlignBench](https://
     elif is_qwen4b:
         official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
@@ -474,7 +474,7 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
     elif is_qwen2b:
         official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone FP16)
@@ -532,7 +532,7 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
     elif is_e4b:
         official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
@@ -597,7 +597,7 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
     else:
         official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 > **Tokenizer Compatibility Note (`commit 86988ca` / SDK `v0.2.0–v0.2.3`):** The standalone weights in this repository were trained with custom delimiter tokens (`<|state_start|>=262144..262155`) serialized in `tokenizer.json`. Later SDK releases (`v0.2.0–v0.2.3`) prioritize Gemma 4 `<unused0>..` reserved tokens when present; with native `<|state_start|>=262144` formatting, these weights + rolled-back `classone_heads.pt` (`F6A6E423...`) achieve **69.3%** (160/231) on JevBench (whereas default `<unused0>` formatting scores **58.4%** / 135/231).
@@ -677,7 +677,7 @@ Measured against a remote cloud LLM decision API round-trip:
 - **`Choice`** — Categorical selection over 2–255 dynamic options with full probability distribution
 - **`Score`** — Continuous ordinal rubric rating over 2–10 levels (expected value)
 
-All outputs are calibrated with a combined NLL + normalized Brier loss and post-hoc temperature scaling.
+All outputs are calibrated with a combined focal NLL (γ=2.0) + normalized Brier + contrastive margin loss and post-hoc temperature scaling.
 
 ## Quickstart
 
