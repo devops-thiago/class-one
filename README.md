@@ -117,6 +117,8 @@ pytest tests/ -v
 uvicorn classone.server.app:app --host 0.0.0.0 --port 8000
 ```
 
+By default, the server derives the per-request prompt token limit directly from the loaded model's configuration (`text_config.max_position_embeddings` or `max_position_embeddings`, e.g., `131072` for Gemma 4 E2B/E4B and `262144` for Qwen 3.5). To enforce a tighter cap for 16 GB VRAM or latency budgets, set `CLASSONE_MAX_TOKENS_PER_REQUEST` (e.g., `CLASSONE_MAX_TOKENS_PER_REQUEST=8192`).
+
 ### 4. Query via Python SDK
 
 ```python

@@ -50,10 +50,10 @@ def _find_word_count_for_limit(target_tokens: int) -> int:
     return guess
 
 
-def test_default_max_tokens_per_request_is_8192(monkeypatch) -> None:
+def test_standalone_without_config_window_is_not_capped_at_8192(monkeypatch) -> None:
     monkeypatch.delenv("CLASSONE_MAX_TOKENS_PER_REQUEST", raising=False)
-    assert server_app.MAX_TOKENS_PER_REQUEST == 8192
-    assert server_app.get_max_tokens_per_request() == 8192
+    server_app._model = None
+    assert server_app.get_max_tokens_per_request() is None
 
 
 def test_prompt_below_and_at_limit_succeeds(monkeypatch) -> None:
@@ -83,16 +83,18 @@ def test_prompt_above_env_limit_returns_400_with_capacity_marker(monkeypatch) ->
     assert any(marker in detail.lower() for marker in CAPACITY_MARKERS)
 
 
-def test_default_limit_rejects_8193_tokens_with_capacity_marker(monkeypatch) -> None:
+def test_model_config_limit_rejects_excess_tokens_with_capacity_marker(monkeypatch) -> None:
     monkeypatch.delenv("CLASSONE_MAX_TOKENS_PER_REQUEST", raising=False)
     client = TestClient(server_app.app)
+    model, builder = server_app.get_pipeline()
+    monkeypatch.setattr(model.config, "max_position_embeddings", 40, raising=False)
 
-    words_at_8193 = _find_word_count_for_limit(8193)
-    resp = client.post("/v1/decide", json=_payload(words_at_8193))
+    words_at_41 = _find_word_count_for_limit(41)
+    resp = client.post("/v1/decide", json=_payload(words_at_41))
     assert resp.status_code == 400
     detail = resp.json()["detail"]
-    assert "8193" in detail
-    assert "8192" in detail
+    assert "41" in detail
+    assert "40" in detail
     assert any(marker in detail.lower() for marker in CAPACITY_MARKERS)
 
 
