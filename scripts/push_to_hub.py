@@ -205,7 +205,7 @@ def generate_model_card(
         intro = (
             f"**[{repo_id}](https://huggingface.co/{repo_id})** is an open-source **System 1 decision model** "
             f"built on [`{base_model}`](https://huggingface.co/{base_model}) "
-            f"using the [ClassOne architecture](https://github.com/devops-thiago/class-one). "
+            f"using the [ClassOne (Classifier One) architecture](https://github.com/devops-thiago/class-one). "
             f"The merged standalone backbone ships directly in this repository — it loads as a single model, "
             f"with no adapter and no separate base-model download."
         )
@@ -345,10 +345,10 @@ Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.
 
 | Metric | Official Benchmark Heaven (`v1.8.8`) |
 |---|---|
-| **Composite Score** | **43.0** (Rank **#113**) |
+| **Composite Score** | **43.0** (Composite rank **#131**) |
 | **Intelligence** | **42.2** |
 | **Calibration** | **58.7** |
-| **Capability** | **50.5** (**#155** of 217 open-weights models) |
+| **Capability** | **50.5** (rank **#181** of 243 open-weights models) |
 
 **Why self-measured local numbers differ from official Benchmark Heaven scores:**
 1. **Sealed vs. public split:** Local self-measurements evaluate strictly the **231 public JevBench tasks**, whereas Benchmark Heaven evaluates both public tasks and private **sealed items**.
