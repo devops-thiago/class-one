@@ -36,6 +36,11 @@ jobs:
           uvx ruff check src/ tests/ scripts/
           uvx ruff format --check src/ tests/ scripts/
 
+      - name: Verify README & baseline heads SHA256 match Hugging Face Hub
+        env:
+          PYTHONPATH: src
+        run: uv run --no-project --python 3.11 --with huggingface_hub python scripts/verify_hub_heads_sha.py
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

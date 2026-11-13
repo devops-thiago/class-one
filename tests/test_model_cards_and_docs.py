@@ -15,11 +15,13 @@ from classone.publishing import (
     compute_sha256,
     find_forbidden_phrases,
     load_baseline_registry,
+    parse_readme_heads_hashes,
     validate_markdown_attribution,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PUSH_SCRIPT = REPO_ROOT / "scripts" / "push_to_hub.py"
+VERIFY_HUB_SCRIPT = REPO_ROOT / "scripts" / "verify_hub_heads_sha.py"
 
 
 def _load_push_module():
@@ -72,6 +74,7 @@ def test_generated_model_cards_for_all_registered_models(standalone: bool):
         )
         assert errors == []
         assert "deadbeef" in card
+        assert entry["heads_sha256"] in card, f"Full SHA256 missing from generated model card for {repo_id}"
 
         lora_card = push_mod.generate_lora_card(repo_id=repo_id, base_model=entry["base_model"])
         lora_errors = validate_markdown_attribution(
@@ -196,3 +199,43 @@ def test_push_to_hub_cli_gate_blocks_missing_report_and_regression(tmp_path: Pat
     )
     assert res_regressed.returncode == 1
     assert "Regression gate blocked upload" in res_regressed.stdout
+
+
+def test_parse_readme_hashes_and_hub_verifier_offline():
+    readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    parsed = parse_readme_heads_hashes(readme_text)
+    registry = load_baseline_registry()
+
+    assert set(parsed.keys()) == set(registry["models"].keys())
+    for repo_id, entry in registry["models"].items():
+        assert parsed[repo_id] == entry["heads_sha256"].upper()
+
+    spec = importlib.util.spec_from_file_location("verify_hub_heads_sha_mod", VERIFY_HUB_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    verify_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(verify_mod)
+
+    class _FakeLfs:
+        def __init__(self, sha: str):
+            self.sha256 = sha
+
+    class _FakePathInfo:
+        def __init__(self, sha: str, size: int = 1234):
+            self.lfs = _FakeLfs(sha)
+            self.size = size
+
+    class _MatchingApi:
+        def get_paths_info(self, repo_id: str, paths: list[str]):
+            assert paths == ["classone_heads.pt"]
+            return [_FakePathInfo(parsed[repo_id].lower())]
+
+    assert verify_mod.verify_hub_heads(api=_MatchingApi()) == []
+
+    class _MismatchedApi:
+        def get_paths_info(self, repo_id: str, paths: list[str]):
+            sha = "0" * 64 if "e2b" in repo_id else parsed[repo_id]
+            return [_FakePathInfo(sha)]
+
+    mismatches = verify_mod.verify_hub_heads(api=_MismatchedApi())
+    assert len(mismatches) == 1
+    assert "classone-gemma4-e2b" in mismatches[0]

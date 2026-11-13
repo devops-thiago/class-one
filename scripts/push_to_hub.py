@@ -23,6 +23,7 @@ from huggingface_hub import HfApi, create_repo
 
 from classone.publishing import (
     check_candidate_regression,
+    get_registered_heads_sha256,
     load_baseline_registry,
     validate_markdown_attribution,
 )
@@ -192,6 +193,10 @@ def generate_model_card(
     short_name = repo_id.split("/")[-1]
     sha = commit_sha or _get_git_commit_sha()
     eval_date, hardware_tag = _load_card_provenance_defaults()
+    certified_heads_sha = get_registered_heads_sha256(repo_id)
+    heads_sha_line = (
+        f"\n> **Certified `classone_heads.pt` SHA256:** `{certified_heads_sha}`\n" if certified_heads_sha else ""
+    )
     dtype_expr = "torch.bfloat16" if any(k in repo_id.lower() for k in ("9b", "4b", "e4b")) else "torch.float16"
     is_qwen = "qwen" in base_model.lower() or "qwen" in repo_id.lower()
     arch_tag = "qwen" if is_qwen else "gemma"
@@ -685,7 +690,7 @@ pip install classone
 ## Repository Files
 
 {files_table}
-
+{heads_sha_line}
 ## Citation
 
 ```bibtex
