@@ -15,7 +15,7 @@ Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* a
 
 ### Official Third-Party Evaluation (Benchmark Heaven)
 
-Independent third-party evaluation is hosted on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`):
+Independent third-party evaluation is hosted on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`, checked `2026-11-13`):
 
 | Model | Composite Score | Intelligence | Calibration | Capability | Source |
 | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -28,7 +28,7 @@ Independent third-party evaluation is hosted on **[Benchmark Heaven](https://ben
 
 ### Self-Measured Multi-Suite Scorecard
 
-> **Provenance:** Executed locally in standalone mode (`--no-lora --pause-tokens 0`, unquantized BF16/FP16 unless noted) on **`2x NVIDIA RTX 5060 Ti 16 GB`** (Date: `2026-11-13`, branch `feat/pillar3a-alignment-and-tool-routing`).
+> **Provenance:** Self-measured on **`2x NVIDIA RTX 5060 Ti 16 GB`** · Date: **`2026-11-13`** · Commit: **`c375207`** (standalone `--no-lora --pause-tokens 0`, unquantized BF16/FP16 unless noted).
 
 | Model Backbone | Effective Params | JevBench v1.6.1 (231 Public Tasks) | Decision Index Suite (Self-Run, 100 Pts) | RLCDAlignBench Balanced Acc | NVIDIA When2Call (Tool Routing) | Deepset Prompt Injections | Median Latency (Edge GPU) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -42,7 +42,7 @@ Independent third-party evaluation is hosted on **[Benchmark Heaven](https://ben
 
 ### Self-Measured JevBench v1.6.1 Public Tier Breakdown
 
-> **Provenance:** Executed locally on **`2x NVIDIA RTX 5060 Ti 16 GB`** (Date: `2026-11-13`).
+> **Provenance:** Self-measured on **`2x NVIDIA RTX 5060 Ti 16 GB`** · Date: **`2026-11-13`** · Commit: **`c375207`**.
 
 | Model Backbone | Easy Tier (48) | Original Tier (72) | Hard Tier (111) | Overall Public (231) |
 | :--- | :---: | :---: | :---: | :---: |
@@ -200,7 +200,7 @@ python scripts/eval_jevbench_v16.py --mode local
 python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Self-Measured Public 4-Axis Scorecard (`2x NVIDIA RTX 5060 Ti 16 GB`, ClassOne Qwen 3.5 9B):**
+**Self-Measured Public 4-Axis Scorecard (`2x NVIDIA RTX 5060 Ti 16 GB` · Date: `2026-11-13` · Commit: `c375207`, ClassOne Qwen 3.5 9B):**
 
 | Axis | Weight | Score (0–100) | Metric Details |
 | :--- | :---: | :---: | :--- |
@@ -227,7 +227,7 @@ python scripts/eval_decision_index.py --mode local
 python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:8000/v1/decide
 ```
 
-**Self-Measured Decision Index Suite Results (`2x NVIDIA RTX 5060 Ti 16 GB`, ClassOne Qwen 3.5 9B):**
+**Self-Measured Decision Index Suite Results (`2x NVIDIA RTX 5060 Ti 16 GB` · Date: `2026-11-13` · Commit: `c375207`, ClassOne Qwen 3.5 9B):**
 
 | Capability Domain | Domain Weight | Domain Score | Raw Accuracy |
 | :--- | :---: | :---: | :---: |

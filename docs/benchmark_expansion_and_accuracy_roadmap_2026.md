@@ -177,7 +177,9 @@ sequenceDiagram
 
 ### 1. Unified 6-Benchmark Performance Matrix Across Supported Architectures
 
-| Model Architecture | Scale | Precision | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Total (231) | HF Decision Index (50) | RLCDAlignBench BalAcc | NVIDIA When2Call (100) | Deepset Prompt Injection (116) | WildGuardTest Safety (100) |
+> **Self-Measured Provenance:** Historical November 2026 ledger measured locally on **`2x NVIDIA RTX 5060 Ti 16 GB`** (see `README.md` for current promoted standalone checkpoints and official Benchmark Heaven links).
+
+| Model Architecture | Scale | Precision | JevBench Easy (48) | JevBench Orig (72) | JevBench Hard (111) | JevBench Total (231) | Decision Index Suite (Self-Run, 50) | RLCDAlignBench BalAcc | NVIDIA When2Call (100) | Deepset Prompt Injection (116) | WildGuardTest Safety (100) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | **devops-thiago/classone-qwen3.5-9b** *(Agentic/Align Record)* | 9.2B | 4-bit NF4 + FP32 Heads | **100.0%** | **97.2%** | **59.5%** | **79.7% (184/231)** | **100.0%** | **63.1% (0.615 AUROC)** | **74.0% (0.1257 ECE)** | **72.41% (0.7707 AUROC)** | **89.0% (0.9607 AUROC)** |
 | **devops-thiago/classone-qwen3.5-9b** *(JevBench 80% Milestone)* | 9.2B | 4-bit NF4 + FP32 Heads | **100.0%** | **97.2%** | **60.4%** | **80.1% (185/231)** | **100.0%** | **60.1% (0.594 AUROC)** | **51.0% (0.3605 ECE)** | **65.52% (0.6366 AUROC)** | **85.0% (0.9445 AUROC)** |
@@ -202,7 +204,7 @@ sequenceDiagram
      - **Deepset Prompt Injections** improved from **65.52% -> 72.41% (+6.89 pp)** and **AUROC from 0.6366 -> 0.7707 (+0.1341)** with **96.4% benign specificity**.
      - **WildGuardTest** improved from **85.00% -> 89.00% (+4.00 pp)** and **AUROC from 0.9445 -> 0.9607** (**0.0700 ECE**, **84.09% adversarial jailbreak accuracy**, **86.54% harm recall**).
      - **RLCDAlignBench** reached a **new all-time project record of 63.1% Balanced Accuracy** (**0.933 Honesty AUROC**, **0.867 Refusal AUROC**, **85.7% Concealing Uncertainty**, **83.3% Power Seeking**).
-     - **JevBench v1.6.1** improved from **78.4% (181/231) -> 79.7% (184/231) (+1.3 pp)** over its starting `qwen9b_top3_candidate` checkpoint, lifting **Hard Tier from 55.9% (62/111) -> 59.5% (66/111) (+3.6 pp)** while preserving **100.00 / 100.00 on the HF Decision Index**.
+     - **JevBench v1.6.1** improved from **78.4% (181/231) -> 79.7% (184/231) (+1.3 pp)** over its starting `qwen9b_top3_candidate` checkpoint, lifting **Hard Tier from 55.9% (62/111) -> 59.5% (66/111) (+3.6 pp)** while preserving **100.00 / 100.00 on the Decision Index Suite (Self-Run)**.
 4. **Inverse-Softplus Temperature Clamping in Head Souping (`scripts/soup_candidate_heads.py`):**
    - `NoulHead` and `ChoiceHead` parameterize temperature via `temperature_raw` where $T = \text{softplus}(\text{temperature\_raw}) + 0.10$ (so $T = 0.50$ corresponds to $\text{temperature\_raw} \approx -0.709$).
    - Clamping must always be applied in effective temperature space ($T \in [0.48, 0.52]$) and mapped back via $\log(\exp(T - 0.10) - 1.0)$ rather than clamping `temperature_raw` directly.

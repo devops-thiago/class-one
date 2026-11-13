@@ -298,11 +298,12 @@ print("Anger score:   ", results["anger"].score)
         f"> **Self-Measured Evaluation Provenance:** Executed locally on `{hardware_tag}` "
         f"(Date: `{eval_date}`, Commit: `{sha}`). See [Official Results (Benchmark Heaven)](#official-results-benchmark-heaven) below for third-party sealed evaluation."
     )
+    table_meta = f"*Self-measured on `{hardware_tag}` · Date: `{eval_date}` · Commit: `{sha}`*"
 
     if is_qwen9b:
-        official_section = """## Official Results (Benchmark Heaven)
+        official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([model page: `classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`):
+Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([model page: `classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`, checked `{eval_date}`):
 
 | Metric | Official Benchmark Heaven (`v1.8.8`) |
 |---|---|
@@ -314,12 +315,14 @@ Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.
 **Why self-measured local numbers differ from official Benchmark Heaven scores:**
 1. **Sealed vs. public split:** Local self-measurements evaluate strictly the **231 public JevBench tasks**, whereas Benchmark Heaven evaluates both public tasks and private **sealed items**.
 2. **Public/sealed gap penalty:** Benchmark Heaven applies a generalization penalty when performance diverges between public and sealed subsets.
-3. **Strict 10 s rule & latency/cost normalization:** Tasks exceeding 10 seconds are penalized to zero, and speed/cost axes are normalized on server-grade reference GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+3. **Strict 10 s rule & latency/cost normalization:** Tasks exceeding 10 seconds are penalized to zero, and speed/cost axes are normalized on server-grade reference GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured)
 
-Evaluated standalone on the 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `68FCDB31...`):
+Evaluated standalone on the 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (heads SHA256 `68FCDB31...`).
+
+{table_meta}
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
@@ -330,7 +333,9 @@ Evaluated standalone on the 231 public tasks in [fstandhartinger/jevbench](https
 
 ### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-Self-run local evaluation across the 50 tasks from [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`{hardware_tag}`):
+Self-run local evaluation across the 50 tasks from [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index).
+
+{table_meta}
 
 | Domain | Tasks | Accuracy (%) |
 |---|---|---|
@@ -343,7 +348,9 @@ Self-run local evaluation across the 50 tasks from [`multimodalart/jev-decision-
 
 ### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured)
 
-Self-measured across the 10 alignment failure modes in [RLCDAlignBench](https://huggingface.co/datasets/sumleo/RLCDAlignBench) (`arXiv:2609.29429`, `{hardware_tag}`):
+Self-measured across the 10 alignment failure modes in [RLCDAlignBench](https://huggingface.co/datasets/sumleo/RLCDAlignBench) (`arXiv:2609.29429`).
+
+{table_meta}
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -360,20 +367,24 @@ Self-measured across the 10 alignment failure modes in [RLCDAlignBench](https://
 
 ### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured)
 
+{table_meta}
+
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **75.00%** | **97.1%** `tool_call`, **79.2%** `request_for_info` | **0.1322** | 385.9 ms |
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **89.00%** (89.10% BalAcc) | **0.9607 AUROC** (**84.1%** Adversarial, **91.7%** Benign Spec) | **0.0700** | 108.9 ms |
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **71.55%–72.41%** (83–84/116) | **0.7902 AUROC** (**96.4%** Benign Spec, **48.3%–50.0%** Recall) | 0.2478 | 106.5 ms |"""
     elif is_qwen4b:
-        official_section = """## Official Results (Benchmark Heaven)
+        official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
 
-Evaluated standalone (`--bf16 --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `654DA038...`):
+Evaluated standalone (`--bf16 --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (heads SHA256 `654DA038...`).
+
+{table_meta}
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
@@ -388,7 +399,9 @@ Evaluated standalone (`--bf16 --no-lora --pause-tokens 0`) across all 231 public
 
 ### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`, `{hardware_tag}`):
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`).
+
+{table_meta}
 
 | Domain | Weight | Accuracy (%) | Score |
 |---|---|---|---|
@@ -401,6 +414,8 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 
 ### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone BF16)
 
+{table_meta}
+
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **Power Seeking** | 6 | **0.889** | **66.7%** | 0.2187 | 1036.6 ms |
@@ -411,20 +426,24 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 
 ### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone)
 
+{table_meta}
+
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified, 4-bit) | **89.00%** (88.94% BalAcc) | **0.9335 AUROC** (**91.07%** Vanilla, **86.36%** Adversarial) | **0.0840** | 231.9 ms |
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full, BF16) | **57.76%** (67/116) | **0.7619 AUROC** (**100.0%** Benign Spec, **18.3%** Recall) | 0.3825 | 141.1 ms |
 | **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified, BF16) | **35.00%** | **88.2%** `tool_call` (30/34), **11.9%** `cannot_answer` | 0.4188 | 546.4 ms |"""
     elif is_qwen2b:
-        official_section = """## Official Results (Benchmark Heaven)
+        official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone FP16)
 
-Evaluated standalone (`--no-quant --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `BD24D863...`):
+Evaluated standalone (`--no-quant --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (heads SHA256 `BD24D863...`).
+
+{table_meta}
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
@@ -438,7 +457,9 @@ Evaluated standalone (`--no-quant --no-lora --pause-tokens 0`) across all 231 pu
 
 ### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`, `{hardware_tag}`):
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`).
+
+{table_meta}
 
 | Domain | Weight | Accuracy (%) | Score |
 |---|---|---|---|
@@ -451,6 +472,8 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 
 ### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone FP16)
 
+{table_meta}
+
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **Honesty (Deception)** | 11 | **0.800** | **72.7%** | 0.2922 | 478.1 ms |
@@ -461,20 +484,24 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 
 ### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone FP16)
 
+{table_meta}
+
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **83.00%** (82.69% BalAcc) | **0.8856 AUROC** (**90.38%** Harm Recall, **83.93%** Vanilla) | 0.1075 | 98.1 ms |
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **51.72%** (60/116) | **0.8232 AUROC** (**100.0%** Benign Spec, **6.7%** Recall) | 0.4182 | 101.4 ms |
 | **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **36.00%** | **94.1%** `tool_call` (32/34) | 0.3324 | 272.7 ms |"""
     elif is_e4b:
-        official_section = """## Official Results (Benchmark Heaven)
+        official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
 
-Evaluated standalone (Pillar 3A promoted release, heads SHA256 `8F7157F4...`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`):
+Evaluated standalone (Pillar 3A promoted release, heads SHA256 `8F7157F4...`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench).
+
+{table_meta}
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
@@ -489,7 +516,9 @@ Evaluated standalone (Pillar 3A promoted release, heads SHA256 `8F7157F4...`) ac
 
 ### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`{hardware_tag}`):
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index).
+
+{table_meta}
 
 | Domain | Weight | Accuracy (%) | Score |
 |---|---|---|---|
@@ -501,6 +530,8 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 | **Overall Weighted Score** | **100.0%** | **98.0%** (49/50) | **98.99 / 100.00** (0.0379 ECE, 99.6 ms p50) |
 
 ### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone)
+
+{table_meta}
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -518,20 +549,24 @@ Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggin
 
 ### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone)
 
+{table_meta}
+
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **84.00%** (84.54% BalAcc) | **0.9233 AUROC** (**97.92%** Benign Spec, **81.82%** Adversarial) | 0.1563 | 84.6 ms |
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **83.62%** (97/116) | **0.9430 AUROC** (**100.0%** Benign Spec, **68.33%** Recall) | **0.1503** | **56.1 ms** |
 | **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **79.00%** | **87.5%** `request_for_info`, **78.6%** `cannot_answer`, **73.5%** `tool_call` | **0.0796** | 218.5 ms |"""
     else:
-        official_section = """## Official Results (Benchmark Heaven)
+        official_section = f"""## Official Results (Benchmark Heaven)
 
-Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (checked `{eval_date}`, benchmark release `v1.8.8`; see the live entry for [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b)). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`{hardware_tag}`)."""
         benchmark_section = f"""{provenance_banner}
 
 > **Tokenizer Compatibility Note (`commit 86988ca` / SDK `v0.2.0–v0.2.3`):** The standalone weights in this repository were trained with custom delimiter tokens (`<|state_start|>=262144..262155`) serialized in `tokenizer.json`. Later SDK releases (`v0.2.0–v0.2.3`) prioritize Gemma 4 `<unused0>..` reserved tokens when present; with native `<|state_start|>=262144` formatting, these weights + rolled-back `classone_heads.pt` (`F6A6E423...`) achieve **69.3%** (160/231) on JevBench (whereas default `<unused0>` formatting scores **58.4%** / 135/231).
 
 ### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone)
+
+{table_meta}
 
 | Evaluation Regime | Overall (231) | Easy (48) | Original (72) | Hard (111) |
 |---|---|---|---|---|
@@ -540,6 +575,8 @@ Official third-party leaderboards are hosted at **[Benchmark Heaven](https://ben
 | **Current Hub Weights under SDK `v0.2.0–v0.2.3` (`<unused0>`)** | 58.4% (135/231) | 91.7% (44/48) | 70.8% (51/72) | 36.0% (40/111) |
 
 ### 2. RLCDAlignBench Alignment & Safety Suite (100 Instances, 2026-10-06 Snapshot)
+
+{table_meta}
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -552,6 +589,8 @@ Official third-party leaderboards are hosted at **[Benchmark Heaven](https://ben
 | **Overall Balanced Accuracy** | **100** | **0.505** | **56.2%** | **0.1944** | **199.2 ms** |
 
 ### 3. Tool-Routing & Safety Guardrail Suites (Self-Measured)
+
+{table_meta}
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -586,6 +625,8 @@ Instead of generating text token by token, ClassOne evaluates structured decisio
 {official_section}
 
 ## Edge vs Cloud Latency (Self-Measured Comparison)
+
+{table_meta}
 
 Measured against a remote cloud LLM decision API round-trip:
 - **ClassOne (Local RTX 5060 Ti):** **52.49 ms** mean latency (19.1 req/s, $0.00 inference cost, 100% private)
