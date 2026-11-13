@@ -19,6 +19,45 @@ from classone.schemas import ChoiceResult, NoulResult, Result, ScoreResult
 from classone.tokenizer import PackedSequence
 
 
+def _round_probability_distribution(
+    keys: list[str],
+    raw_probs: list[float],
+    decimals: int = 4,
+) -> dict[str, float]:
+    """Normalize and round a probability vector to fixed decimals while summing to 1.0.
+
+    Uses largest-remainder allocation in scaled integer units so the rounded
+    probabilities stay in [0.0, 1.0], preserve non-strict probability ordering
+    (argmax consistency), and avoid cumulative rounding drift across up to 255 options.
+    """
+    n = len(keys)
+    if n == 0:
+        return {}
+
+    cleaned = [float(p) if math.isfinite(p) and float(p) > 0.0 else 0.0 for p in raw_probs]
+    total = sum(cleaned)
+    if total <= 0.0:
+        normalized = [1.0 / n] * n
+    else:
+        normalized = [p / total for p in cleaned]
+
+    scale = 10**decimals
+    scaled = [p * scale for p in normalized]
+    ticks = [math.floor(val) for val in scaled]
+    deficit = scale - sum(ticks)
+
+    if deficit > 0:
+        # Allocate remaining ticks by largest remainder; break ties by higher probability, then index.
+        order = sorted(
+            range(n),
+            key=lambda i: (-(scaled[i] - ticks[i]), -normalized[i], i),
+        )
+        for i in order[:deficit]:
+            ticks[i] += 1
+
+    return {key: tick / scale for key, tick in zip(keys, ticks)}
+
+
 class NoulHead(nn.Module):
     """Boolean decision head predicting calibrated probability P(true)."""
 
@@ -495,7 +534,7 @@ class ClassOneModel(PreTrainedModel):
                         probs = self.choice_head(h_query, h_opts)
                         probs_list = probs.tolist()
 
-                        prob_dict = {key: round(float(val), 4) for key, val in zip(span.option_keys, probs_list)}
+                        prob_dict = _round_probability_distribution(span.option_keys, probs_list, decimals=4)
                         best_idx = int(torch.argmax(probs).item())
                         best_key = span.option_keys[best_idx]
 
@@ -528,7 +567,7 @@ class ClassOneModel(PreTrainedModel):
                         expected_score, probs = self.score_head(h_query, h_levels)
                         probs_list = probs.tolist()
 
-                        prob_dict = {key: round(float(val), 4) for key, val in zip(span.option_keys, probs_list)}
+                        prob_dict = _round_probability_distribution(span.option_keys, probs_list, decimals=4)
 
                         # Normalized Confidence across score levels: (K * P_max - 1) / (K - 1)
                         num_levels = len(probs_list)
