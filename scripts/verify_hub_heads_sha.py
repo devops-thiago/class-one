@@ -4,15 +4,30 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import sys
 from pathlib import Path
 
 from huggingface_hub import HfApi
 
-from classone.publishing import load_baseline_registry, parse_readme_heads_hashes
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_publishing_module():
+    """Loads src/classone/publishing.py directly without importing heavy package dependencies."""
+    pub_path = REPO_ROOT / "src" / "classone" / "publishing.py"
+    spec = importlib.util.spec_from_file_location("classone_publishing_standalone", pub_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load publishing module from {pub_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_publishing = _load_publishing_module()
+load_baseline_registry = _publishing.load_baseline_registry
+parse_readme_heads_hashes = _publishing.parse_readme_heads_hashes
 
 
 def verify_hub_heads(
