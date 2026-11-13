@@ -18,6 +18,7 @@ class ClassOneConfig(PretrainedConfig):
         dropout: float = 0.1,
         temperature: float = 1.0,
         use_temperature_scaling: bool = True,
+        max_position_embeddings: int | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -27,3 +28,4 @@ class ClassOneConfig(PretrainedConfig):
         self.dropout = dropout
         self.temperature = temperature
         self.use_temperature_scaling = use_temperature_scaling
+        self.max_position_embeddings = max_position_embeddings

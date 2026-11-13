@@ -5,8 +5,10 @@ Exposes the POST /v1/decide and POST /v1/classone endpoints.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -18,24 +20,84 @@ from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import DecisionRequest, DecisionResponse, DecisionUsage
 from classone.tokenizer import ClassOnePromptBuilder
 
+logger = logging.getLogger(__name__)
+
 # Global thread-safe state
 _pipeline_lock = threading.Lock()
 _model: ClassOneModel | None = None
 _tokenizer: Any | None = None
 _prompt_builder: ClassOnePromptBuilder | None = None
+_warned_uncapped = False
 
 MAX_QUESTIONS_PER_REQUEST = 128
-MAX_TOKENS_PER_REQUEST = 8192
 
 
-def get_max_tokens_per_request() -> int:
-    """Resolve the per-request prompt token limit dynamically."""
+def _get_field(obj: Any, name: str) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, Mapping):
+        return obj.get(name)
+    return getattr(obj, name, None)
+
+
+def _positive_int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value if value > 0 else None
+
+
+def context_length_from_config(config: Any) -> int | None:
+    """Resolve positive max_position_embeddings from a Hugging Face / ClassOne config."""
+    if config is None:
+        return None
+    text_config = _get_field(config, "text_config")
+    for source in (text_config, config):
+        limit = _positive_int_or_none(_get_field(source, "max_position_embeddings"))
+        if limit is not None:
+            return limit
+    return None
+
+
+def context_length_from_model(model: Any) -> int | None:
+    """Resolve context window from model.config or model.backbone.config."""
+    if model is None:
+        return None
+    limit = context_length_from_config(getattr(model, "config", None))
+    if limit is not None:
+        return limit
+    backbone = getattr(model, "backbone", None)
+    if backbone is not None:
+        return context_length_from_config(getattr(backbone, "config", None))
+    return None
+
+
+def get_max_tokens_per_request(model: Any | None = None) -> int | None:
+    """Resolve the per-request prompt token limit dynamically.
+
+    Priority:
+    1. CLASSONE_MAX_TOKENS_PER_REQUEST env var (if non-empty positive int)
+    2. Loaded model / backbone config max_position_embeddings (preferring text_config)
+    3. Uncapped (None) in standalone mode when no model window is configured
+    """
+    global _warned_uncapped
     raw = os.environ.get("CLASSONE_MAX_TOKENS_PER_REQUEST")
-    if raw is None or not raw.strip():
-        return MAX_TOKENS_PER_REQUEST
-    limit = int(raw)
-    if limit <= 0:
-        raise ValueError("CLASSONE_MAX_TOKENS_PER_REQUEST must be a positive integer.")
+    if raw is not None and raw.strip():
+        limit = int(raw)
+        if limit <= 0:
+            raise ValueError("CLASSONE_MAX_TOKENS_PER_REQUEST must be a positive integer.")
+        return limit
+
+    target_model = model if model is not None else _model
+    if target_model is None:
+        target_model, _ = get_pipeline()
+
+    limit = context_length_from_model(target_model)
+    if limit is None and not _warned_uncapped:
+        logger.warning(
+            "Loaded model config does not declare max_position_embeddings; leaving per-request prompt length "
+            "uncapped. Set CLASSONE_MAX_TOKENS_PER_REQUEST to enforce a VRAM or latency budget."
+        )
+        _warned_uncapped = True
     return limit
 
 
@@ -155,8 +217,8 @@ def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
         packed = builder.pack(state=request.state, questions=request.questions)
 
         input_token_count = int(packed.input_ids.shape[1])
-        max_tokens = get_max_tokens_per_request()
-        if input_token_count > max_tokens:
+        max_tokens = get_max_tokens_per_request(model)
+        if max_tokens is not None and input_token_count > max_tokens:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Prompt length ({input_token_count} tokens) exceeds maximum context length ({max_tokens}).",

@@ -361,13 +361,23 @@ class ClassOneModel(PreTrainedModel):
             or getattr(backbone.config, "d_model", None)
             or 2048
         )
+        max_position_embeddings = getattr(text_config, "max_position_embeddings", None) or getattr(
+            backbone.config, "max_position_embeddings", None
+        )
+        if isinstance(max_position_embeddings, bool) or not isinstance(max_position_embeddings, int):
+            max_position_embeddings = None
+        if max_position_embeddings is not None and max_position_embeddings <= 0:
+            max_position_embeddings = None
         if config is None:
             config = ClassOneConfig(
                 base_model_name_or_path=model_name,
                 hidden_size=hidden_size,
+                max_position_embeddings=max_position_embeddings,
             )
         else:
             config.hidden_size = hidden_size
+            if getattr(config, "max_position_embeddings", None) is None and max_position_embeddings is not None:
+                config.max_position_embeddings = max_position_embeddings
 
         model = cls(config=config, backbone=backbone)
 
