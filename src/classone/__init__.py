@@ -1,6 +1,6 @@
 """ClassOne: Open-source System 1 Decision Model Architecture built on Gemma 4 and Qwen 3.5."""
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from classone.modeling import ClassOneConfig, ClassOneModel
 from classone.schemas import (
