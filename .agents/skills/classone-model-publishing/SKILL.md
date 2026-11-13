@@ -56,28 +56,33 @@ This helper will:
 4. Copy `classone_heads.pt` to the staging directory.
 5. Print the exact atomic upload command.
 
-### Step 2: Update Model Card (`README.md`)
-Update the model card in the target directory with:
+### Step 2: Update Model Card (`README.md`) & Baseline Registry
+Verify `benchmarks/baselines.json` and the model card template in `scripts/push_to_hub.py` include:
 - Updated JevBench tier accuracy table (Easy, Original, Hard, and Composite).
-- HF Decision Index score ($100\%$).
-- RLCDAlignBench Balanced Accuracy and AUROC.
+- `Decision Index Suite (Self-Run)` score and `RLCDAlignBench` Balanced Accuracy / AUROC.
+- Per-table self-measurement provenance (`2x NVIDIA RTX 5060 Ti 16 GB`, evaluation date, commit SHA).
+- `Official Results (Benchmark Heaven)` section linking `https://benchmarkheaven.com/jev-models` with benchmark version/checked date and sealed vs. public discrepancy note (no unverified `"#1"` rank claims).
 - Certified candidate head SHA256.
 
-### Step 3: Perform Fast Atomic Push
-Execute `scripts/push_to_hub.py` with `--update-heads-only`:
+### Step 3: Validate Before Push (Non-Regression Gate)
+Run `classone-benchmark-validation` locally **before** uploading and save the verified summary JSON (pass `--eval-report` to `scripts/push_to_hub.py` so regressed candidates are blocked automatically).
+
+### Step 4: Perform Fast Atomic Push
+Execute `scripts/push_to_hub.py` with `--update-heads-only` and `--eval-report`:
 
 ```powershell
 .venv\Scripts\python.exe scripts/push_to_hub.py `
   --checkpoint-dir "checkpoints/classone_qwen9b_merged" `
   --repo-id "devops-thiago/classone-qwen3.5-9b" `
+  --eval-report "benchmarks/results/candidate_eval.json" `
   --update-heads-only
 ```
 
-### Step 4: Verify Live Remote Commit
-Confirm the remote repository has updated:
+### Step 5: Verify Live Remote Commit & Run Post-Push Smoke Check
+Confirm the remote repository updated and `README.md` / `classone_heads.pt` SHA256 match:
 ```powershell
-.venv\Scripts\python.exe -c "from huggingface_hub import HfApi, hf_hub_download; import hashlib; p = hf_hub_download('devops-thiago/classone-qwen3.5-9b', 'classone_heads.pt', force_download=True); print('Remote Head SHA:', hashlib.sha256(open(p, 'rb').read()).hexdigest())"
+.venv\Scripts\python.exe -c "from huggingface_hub import hf_hub_download; import hashlib; p = hf_hub_download('devops-thiago/classone-qwen3.5-9b', 'classone_heads.pt', force_download=True); print('Remote Head SHA:', hashlib.sha256(open(p, 'rb').read()).hexdigest())"
 ```
 
-Next, immediately proceed to run the validation runbook:
+Next, confirm live inference behavior via:
 [classone-benchmark-validation](../classone-benchmark-validation/SKILL.md)

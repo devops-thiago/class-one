@@ -24,6 +24,7 @@ import sys
 import torch
 from transformers import AutoTokenizer
 
+from classone.publishing import check_candidate_regression, load_baseline_registry
 from classone.tokenizer import ClassOnePromptBuilder
 
 # Ensure UTF-8 output on Windows consoles
@@ -78,6 +79,12 @@ def main():
         "--repo-id", type=str, required=True, help="Target HF repo ID (e.g. devops-thiago/classone-qwen3.5-9b)"
     )
     parser.add_argument("--pause-tokens", type=int, default=8, help="Default latent pause tokens")
+    parser.add_argument(
+        "--eval-report",
+        type=str,
+        default=None,
+        help="Optional candidate evaluation JSON to check against benchmarks/baselines.json",
+    )
     args = parser.parse_args()
 
     heads_src = os.path.join(args.snapshot_dir, "classone_heads.pt")
@@ -130,6 +137,22 @@ def main():
                 print(f"[!] WARNING: Gemma 4 delimiter '{delim}' mapped to '{mapped}' instead of '<unused*>'!")
         print("[OK] Confirmed Gemma 4 in-vocab unused token mapping (PLE preserved, 0 extra VRAM).")
 
+    if args.eval_report:
+        with open(args.eval_report, encoding="utf-8") as f:
+            report = json.load(f)
+        failures = check_candidate_regression(
+            args.repo_id,
+            report,
+            heads_path=heads_src,
+            registry=load_baseline_registry(),
+        )
+        if failures:
+            print("[!] REGRESSION GATE FAILED:")
+            for msg in failures:
+                print(f"    - {msg}")
+            sys.exit(1)
+        print("[OK] Candidate evaluation report meets all baseline floors.")
+
     # 4. Next steps command
     print("\n" + "=" * 80)
     print("PREPARATION COMPLETE! RUN THE ATOMIC UPLOAD COMMAND BELOW:")
@@ -137,6 +160,10 @@ def main():
     print("python scripts/push_to_hub.py `")
     print(f'  --checkpoint-dir "{args.target_dir}" `')
     print(f'  --repo-id "{args.repo_id}" `')
+    if args.eval_report:
+        print(f'  --eval-report "{args.eval_report}" `')
+    else:
+        print('  --eval-report "<path/to/eval_report.json>" `')
     print("  --update-heads-only\n")
     print(f"Candidate Head SHA256: {head_sha}")
     print("=" * 80)

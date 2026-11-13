@@ -12,6 +12,7 @@ Two publication modes:
 """
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -19,6 +20,12 @@ import sys
 import tempfile
 
 from huggingface_hub import HfApi, create_repo
+
+from classone.publishing import (
+    check_candidate_regression,
+    load_baseline_registry,
+    validate_markdown_attribution,
+)
 
 
 def _infer_base_model(repo_id: str) -> str:
@@ -123,6 +130,22 @@ def parse_args():
         default=None,
         help="Git commit SHA to embed in model card self-measurement metadata (defaults to HEAD)",
     )
+    parser.add_argument(
+        "--eval-report",
+        type=str,
+        default=None,
+        help="Path to candidate evaluation JSON report verified against benchmarks/baselines.json before upload.",
+    )
+    parser.add_argument(
+        "--allow-regression",
+        action="store_true",
+        help="Override non-regression baseline gate even if candidate metrics fall below benchmarks/baselines.json.",
+    )
+    parser.add_argument(
+        "--skip-eval-gate",
+        action="store_true",
+        help="Explicitly bypass requiring --eval-report when uploading weights or heads.",
+    )
     return parser.parse_args()
 
 
@@ -148,6 +171,17 @@ def _resolve_device(name: str) -> str:
     return "cpu"
 
 
+def _load_card_provenance_defaults() -> tuple[str, str]:
+    """Reads canonical evaluation date and hardware tag from benchmarks/baselines.json."""
+    try:
+        registry = load_baseline_registry()
+        return str(registry.get("eval_date", "2026-11-13")), str(
+            registry.get("hardware", "2x NVIDIA RTX 5060 Ti 16 GB")
+        )
+    except OSError:
+        return "2026-11-13", "2x NVIDIA RTX 5060 Ti 16 GB"
+
+
 def generate_model_card(
     repo_id: str,
     base_model: str,
@@ -157,8 +191,7 @@ def generate_model_card(
     """Generates a Hugging Face model card with verified self-measured and official benchmark results."""
     short_name = repo_id.split("/")[-1]
     sha = commit_sha or _get_git_commit_sha()
-    eval_date = "2026-11-13"
-    hardware_tag = "2x NVIDIA RTX 5060 Ti 16 GB"
+    eval_date, hardware_tag = _load_card_provenance_defaults()
     dtype_expr = "torch.bfloat16" if any(k in repo_id.lower() for k in ("9b", "4b", "e4b")) else "torch.float16"
     is_qwen = "qwen" in base_model.lower() or "qwen" in repo_id.lower()
     arch_tag = "qwen" if is_qwen else "gemma"
@@ -598,7 +631,7 @@ Official third-party JevBench leaderboards are hosted at **[Benchmark Heaven](ht
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **50.86%** (59/116) | **0.6214 AUROC** (**75.0%** Injection Recall) | 0.3412 | 41.6 ms |
 | **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **35.00%** | **85.3%** `tool_call` (29/34) | 0.5376 | 106.8 ms |"""
 
-    return f"""---
+    card = f"""---
 license: apache-2.0
 base_model: {base_model}
 tags:
@@ -669,6 +702,14 @@ pip install classone
 - Derived from [{base_model}](https://huggingface.co/{base_model}) ({"Alibaba Cloud (Qwen Team)" if is_qwen else "Google"}) — Apache License 2.0
 - Architecture & training code: [devops-thiago/class-one](https://github.com/devops-thiago/class-one) — Apache 2.0
 """
+    errors = validate_markdown_attribution(
+        card,
+        source_name=f"model card ({repo_id})",
+        require_official_section=True,
+    )
+    if errors:
+        raise ValueError("Model card failed attribution validation:\n  - " + "\n  - ".join(errors))
+    return card
 
 
 def generate_lora_card(repo_id: str, base_model: str) -> str:
@@ -676,7 +717,7 @@ def generate_lora_card(repo_id: str, base_model: str) -> str:
     short_name = repo_id.split("/")[-1]
     creator = "Alibaba Cloud (Qwen Team)" if "qwen" in base_model.lower() else "Google"
     yaml_base = repo_id if "e4b" in base_model.lower() else base_model
-    return f"""---
+    card = f"""---
 base_model: {yaml_base}
 library_name: peft
 tags:
@@ -723,6 +764,14 @@ For end-to-end decision inference (packing questions, calibrated outputs), see t
 - Base model: [{base_model}](https://huggingface.co/{base_model}) ({creator}) — Apache License 2.0
 - Architecture: [devops-thiago/class-one](https://github.com/devops-thiago/class-one) — Apache 2.0
 """
+    errors = validate_markdown_attribution(
+        card,
+        source_name=f"LoRA card ({repo_id})",
+        require_official_section=False,
+    )
+    if errors:
+        raise ValueError("LoRA card failed attribution validation:\n  - " + "\n  - ".join(errors))
+    return card
 
 
 def merge_and_export(
@@ -787,6 +836,62 @@ def merge_and_export(
     return workdir
 
 
+def _resolve_candidate_heads_path(args) -> str | None:
+    """Returns path to candidate classone_heads.pt if present in checkpoint or merged dirs."""
+    candidates = []
+    if args.checkpoint_dir:
+        candidates.append(os.path.join(args.checkpoint_dir, "classone_heads.pt"))
+    if args.merged_dir:
+        candidates.append(os.path.join(args.merged_dir, "classone_heads.pt"))
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _enforce_pre_upload_gate(args) -> None:
+    """Blocks weight/head uploads unless baseline evaluation passes or is explicitly overridden."""
+    if getattr(args, "readme_only", False) or getattr(args, "skip_eval_gate", False):
+        return
+
+    try:
+        registry = load_baseline_registry()
+    except OSError:
+        return
+
+    if args.repo_id not in registry.get("models", {}):
+        return
+
+    eval_report_path = getattr(args, "eval_report", None)
+    if not eval_report_path:
+        floors = registry["models"][args.repo_id].get("floors", {})
+        print(
+            f"[!] Upload blocked for {args.repo_id}: pass --eval-report <path.json> verifying baseline floors "
+            f"({floors}) or explicitly pass --skip-eval-gate."
+        )
+        sys.exit(1)
+
+    if not os.path.exists(eval_report_path):
+        print(f"[!] Error: --eval-report file not found: {eval_report_path}")
+        sys.exit(1)
+
+    with open(eval_report_path, encoding="utf-8") as f:
+        report = json.load(f)
+
+    failures = check_candidate_regression(
+        args.repo_id,
+        report,
+        heads_path=_resolve_candidate_heads_path(args),
+        registry=registry,
+    )
+    if failures and not getattr(args, "allow_regression", False):
+        print("[!] Regression gate blocked upload:")
+        for msg in failures:
+            print(f"    - {msg}")
+        print("[!] Pass --allow-regression only if intentionally publishing below baseline.")
+        sys.exit(1)
+
+
 def main():
     args = parse_args()
     if not args.base_model:
@@ -796,6 +901,8 @@ def main():
     if not args.merge_standalone and not readme_only and not args.checkpoint_dir:
         print("[!] Error: --checkpoint-dir is required unless --merge-standalone or --readme-only is set.")
         sys.exit(1)
+
+    _enforce_pre_upload_gate(args)
 
     token = args.token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
     if not token and os.path.exists(".env"):
