@@ -1,13 +1,70 @@
-# ClassOne: System 1 Decision Model Architecture
+# ClassOne (Classifier One)
 
 [![CI](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml/badge.svg)](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/devops-thiago)
-[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-Curriculum%20(23.5k)-orange)](https://huggingface.co/datasets/devops-thiago/classone-system1-decision-curriculum)
+[![Code License: Apache 2.0](https://img.shields.io/badge/Code-Apache_2.0-blue.svg)](LICENSE)
+[![Dataset License: CC BY-NC-SA 4.0](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-CC_BY--NC--SA_4.0-orange)](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)
+[![PyPI](https://img.shields.io/pypi/v/classone)](https://pypi.org/project/classone/)
+[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)
 
-**ClassOne** is an open-source **System 1 decision model architecture**. Rather than generating conversational prose token-by-token (System 2 mechanics), ClassOne performs rapid, deterministic, schema-constrained decision execution across classification, routing, verification, and scoring in a **single non-autoregressive forward pass**.
+**ClassOne (Classifier One)** attaches calibrated single-pass decision heads (`Noul`, `Choice`, `Score`) onto open-weight language models (`Qwen 3.5` and `Gemma 4`). Instead of decoding JSON or explanatory prose token by token, a model evaluates structured booleans, multi-option routing, and ordinal rubrics in **one forward pass** with probabilities calibrated by strictly proper scoring rules (NLL + Brier + margin loss + temperature scaling). Use it directly via the Python SDK and FastAPI server or load the merged standalone checkpoints from Hugging Face.
 
-Inspired by Daniel Kahneman's cognitive framework in *Thinking, Fast and Slow* and strictly proper scoring rules (Brier, 1950; Gneiting & Raftery, 2007).
+---
+
+## Quickstart
+
+Install the package and Python SDK from PyPI:
+
+```bash
+pip install classone
+```
+
+Start a local decision server backed by a Hugging Face checkpoint:
+
+```bash
+CLASSONE_BASE_MODEL=devops-thiago/classone-qwen3.5-2b uvicorn classone.server.app:app --host 127.0.0.1 --port 8000
+```
+
+Query typed `Noul`, `Choice`, and `Score` decisions in Python:
+
+```python
+from classone import Choice, ClassOneClient, Noul, Score
+
+with ClassOneClient(base_url="http://127.0.0.1:8000") as client:
+    res = client.decide(
+        state="Customer was charged twice on invoice #412 and wants an immediate refund.",
+        questions={
+            "refund": Noul(instructions="Is the customer requesting a refund?"),
+            "route": Choice(
+                instructions="Target team:",
+                criteria={
+                    "billing": "Payment errors, duplicate charges, or refunds",
+                    "support": "General account questions",
+                },
+            ),
+            "urgency": Score(instructions="Ticket urgency:", criteria=["low", "medium", "critical"]),
+        },
+    )
+
+print("Refund P(true):", res.nouls["refund"].noul)
+print("Route Choice:", res.choices["route"].choice, "margin:", res.choices["route"].margin)
+print("Urgency Score:", res.scores["urgency"].score)
+```
+
+---
+
+## Published Models on Hugging Face Hub
+
+> [!TIP]
+> Browse all published standalone weights and calibrated heads in the Hugging Face Collection:
+> **[ClassOne System 1 Decision Models Collection](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)**
+
+| Repository ID | Base Model | Context | Calibrated Heads SHA256 (Verified on Hub) | Formats |
+| :--- | :--- | :---: | :--- | :--- |
+| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 256k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 256k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `8F7157F4D67D21698F94A3DF69B8492F4CC592DAC65E91AC47A83FD2E083AFDC` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 256k | `BD24D8639DB9054CD9E0869E8DD2CF432D0B9A63AC82C557186A95D371E255F6` | FP16/BF16 Standalone, 8-bit |
+| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `F6A6E42365158D99807B8995C800429A0BD2B12755EDC1DEC5823400D35F337D` | FP16/BF16 Standalone, 8-bit |
 
 ---
 
@@ -19,7 +76,7 @@ Independent third-party evaluation is hosted on **[Benchmark Heaven](https://ben
 
 | Model | Composite Score | Intelligence | Calibration | Capability | Source |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **`classone-qwen3.5-9b`** | **43.0** (Rank **#113**) | **42.2** | **58.7** | **50.5** (**#155** of 217 open-weights) | [`benchmarkheaven.com/jev-models/classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) |
+| **`classone-qwen3.5-9b`** | **43.0** (Composite rank **#131**) | **42.2** | **58.7** | **50.5** (rank **#181** of 243 open-weights) | [`benchmarkheaven.com/jev-models/classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) |
 
 **Why official Benchmark Heaven scores differ from local self-measurements below:**
 - **Sealed vs. public tasks:** Local scripts evaluate only the **231 public JevBench tasks**; Benchmark Heaven additionally runs private **sealed items**.
@@ -57,61 +114,37 @@ Independent third-party evaluation is hosted on **[Benchmark Heaven](https://ben
 ## Key Architectural Innovations
 
 1. **Bilinear Interaction Scorer (`ChoiceHead`):**
-   Combines scaled dot-product attention with full non-linear bilinear matching:
+   Combines scaled dot-product attention with non-linear bilinear matching:
    $$\text{features} = [q;\, k;\, |q - k|;\, q \odot k], \quad \text{logits} = \frac{q \cdot k}{\sqrt{d}} + \text{MLP}(\text{features})$$
-   Enables deep interaction matching between prompt instructions and semantic candidate descriptions without sequence decode.
+   Matches prompt instructions against natural-language candidate criteria in a single forward pass.
 2. **Question Preamble Conditioning:**
-   For documents $>600$ tokens, the prompt builder automatically injects `<|state_start|>\nTarget Objectives:\n...\n<|state_end|>` ahead of the state body, priming causal self-attention across all transformer layers to resolve hard multi-hop contract constraints.
+   For documents $>600$ tokens, the prompt builder prepends `<|state_start|>\nTarget Objectives:\n...\n<|state_end|>` ahead of the document body to prime causal self-attention across transformer layers.
 3. **2D / 4D Position-Invariant Attention Mask:**
-   Eliminates option-order recency bias by isolating candidate options during ingestion so choices attend only to the state and criteria without causally attending to earlier options.
+   Isolates candidate options during ingestion so options attend to state/instructions without causally attending to earlier options.
 4. **Scale-Invariant Normalized Confidence:**
-   Computes calibrated confidence invariant to candidate set size:
+   Computes normalized confidence invariant to candidate set size:
    $$\text{Confidence} = \frac{K \cdot P_{\max} - 1}{K - 1} \quad \text{for } K \text{ choices}$$
 5. **Precision Guard & Dynamic Quantization:**
-   Backbone weights support 4-bit NF4 and 8-bit dynamic quantization while decision heads remain strictly in **FP16 / FP32** to preserve calibrated probability margins.
-6. **Ultra-Low Latency CPU Containerization:**
-   Containerized execution on **2 vCPUs and 8GB RAM** achieves **2,097.15 tokens/sec** and **19.54 decisions/sec** at 754.6 ms median latency (0 GPUs, 0 GGUF).
-
----
+   Supports 4-bit NF4 and 8-bit dynamic quantization on backbones while keeping decision heads in **FP16 / FP32**.
+6. **CPU Containerization:**
+   Containerized INT8 CPU execution on **2 vCPUs and 8 GB RAM** achieves **2,097.15 tokens/sec** and **19.54 decisions/sec** at **754.6 ms** median latency (see [`docs/docker_cpu_benchmarks.md`](docs/docker_cpu_benchmarks.md)).
 
 ## Training Methodology: RLCD (Reinforcement Learning for Calibrated Decisions)
 
-ClassOne models are aligned using **Strictly Proper Scoring Rules** rather than open-ended conversational RLHF:
+Models are calibrated with **Strictly Proper Scoring Rules** rather than conversational RLHF:
 
 1. **Multi-Objective RLCD Loss:**
    $$\mathcal{L}_{\text{RLCD}} = \alpha \mathcal{L}_{\text{Focal}}(\gamma=2.0) + \beta \mathcal{L}_{\text{Brier}} + \lambda \mathcal{L}_{\text{Margin}}$$
-   - **Focal Log-Loss:** Down-weights easy examples and forces gradient updates to concentrate on hard decision boundaries.
-   - **Brier Score:** Penalizes probability deviation, mathematically guaranteeing that the model has zero incentive to hedge or hallucinate unwarranted overconfidence.
-   - **Contrastive Margin Penalty:** Directly penalizes decisions with sub-threshold logit separation between top-1 and distractor options.
 2. **Temperature Floor Clamping:**
-   Post-hoc temperature scaling prevents probability softening by enforcing empirical calibration floors:
-   $$T_{\text{noul}} \in [0.45, 0.60], \quad T_{\text{choice}} \in [0.45, 0.60], \quad T_{\text{score}} \in [0.55, 0.65]$$
-3. **Progressive Multi-Stage Curricula:**
-   Trained on a 23,500-sample human-curated curriculum spanning ContractNLI, CUAD, SciQ, Banking77, ToxicChat, XSTest, and Agentic boundary pairs.
-4. **Weight-Averaged Model Souping:**
-   Combines converged LoRA weights and decision heads across curriculum stages (`soup_heads_70.py`), yielding monotonic calibration and benchmark gains.
+   Post-hoc temperature scaling clamps effective temperatures ($T_{\text{noul}}, T_{\text{choice}} \in [0.45, 0.60]$, $T_{\text{score}} \in [0.55, 0.65]$) to preserve option margin sharpness.
+3. **Multi-Stage Curriculum:**
+   Trained across real-world classification, NLI, contract compliance, safety, and tool-routing corpora ([`devops-thiago/classone-system-one-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)).
 
 ---
 
-## Published Models on Hugging Face Hub
+## Development Setup & Local Server
 
-> [!TIP]
-> Explore all published models and datasets in the official Hugging Face Collection:
-> **[ClassOne System 1 Decision Models Collection](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)**
-
-| Repository ID | Base Model | Context | Calibrated Heads SHA256 (Verified on Hub) | Formats |
-| :--- | :--- | :---: | :--- | :--- |
-| [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 256k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16 Standalone, 4-bit NF4 |
-| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 256k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16 Standalone, 4-bit NF4 |
-| [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `8F7157F4D67D21698F94A3DF69B8492F4CC592DAC65E91AC47A83FD2E083AFDC` | BF16 Standalone, 4-bit NF4 |
-| [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 256k | `BD24D8639DB9054CD9E0869E8DD2CF432D0B9A63AC82C557186A95D371E255F6` | FP16/BF16 Standalone, 8-bit |
-| [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `F6A6E42365158D99807B8995C800429A0BD2B12755EDC1DEC5823400D35F337D` | FP16/BF16 Standalone, 8-bit |
-
----
-
-## Quickstart
-
-### 1. Installation
+### 1. Editable Install & Test Suite
 
 ```bash
 git clone https://github.com/devops-thiago/class-one.git
@@ -119,78 +152,51 @@ cd class-one
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-```
-
-### 2. Run Test Suite
-
-```bash
 pytest tests/ -v
 ```
 
-### 3. Start API Service
+### 2. Start the FastAPI Service
 
 ```bash
-uvicorn classone.server.app:app --host 0.0.0.0 --port 8000
+CLASSONE_BASE_MODEL=devops-thiago/classone-qwen3.5-2b uvicorn classone.server.app:app --host 0.0.0.0 --port 8000
 ```
 
-By default, the server derives the per-request prompt token limit directly from the loaded model's configuration (`text_config.max_position_embeddings` or `max_position_embeddings`, e.g., `131072` for Gemma 4 E2B/E4B and `262144` for Qwen 3.5). To enforce a tighter cap for 16 GB VRAM or latency budgets, set `CLASSONE_MAX_TOKENS_PER_REQUEST` (e.g., `CLASSONE_MAX_TOKENS_PER_REQUEST=8192`).
+By default, the server derives the per-request prompt token limit from the loaded model configuration (`text_config.max_position_embeddings` or `max_position_embeddings`, e.g., `131072` for Gemma 4 E2B/E4B and `262144` for Qwen 3.5). Set `CLASSONE_MAX_TOKENS_PER_REQUEST` to enforce a tighter cap for 16 GB VRAM or latency budgets.
 
-### 4. Query via Python SDK
+### 3. Docker Deployment (CPU Container)
 
-```python
-from classone import ClassOneClient, Choice, Noul, Score
-
-with ClassOneClient(base_url="http://localhost:8000") as client:
-    response = client.decide(
-        state="Customer account was locked after three incorrect attempts within 15 minutes.",
-        questions={
-            "urgent": Noul(instructions="Is this an urgent security event?"),
-            "action": Choice(
-                instructions="Action required:",
-                criteria={
-                    "unlock": "Send automated unlock verification link",
-                    "escalate": "Escalate to SecOps fraud team",
-                },
-            ),
-            "severity": Score(instructions="Assess severity:", criteria=["low", "medium", "critical"]),
-        },
-    )
-
-    print("Urgent P(true):", response.nouls["urgent"].noul)
-    print("Action Choice:", response.choices["action"].choice)
-    print("Choice Margin:", response.choices["action"].margin)
-    print("Severity Score:", response.scores["severity"].score)
-```
-
----
-
-## Docker Deployment (2 vCPUs, 8GB RAM, Pure CPU)
-
-Build and deploy the lean CPU container with zero GPU requirements:
+`CLASSONE_BASE_MODEL` accepts any published Hugging Face model ID (downloaded automatically on container startup via `transformers` and `huggingface_hub`):
 
 ```bash
-# 1. Build image (uses CPU-only PyTorch wheels)
+# Build CPU image
 docker build -t classone:cpu .
 
-# 2. Run container constrained to 2 vCPUs and 8GB RAM
+# Run with a published Hugging Face checkpoint and persistent HF cache volume
 docker run -d --name classone-cpu \
   --cpus=2 --memory=8g -p 8000:8000 \
   -e CLASSONE_DEVICE=cpu \
-  -e CLASSONE_BASE_MODEL=/app/checkpoints/classone_cpu_q8.pt \
-  -v "$(pwd)/checkpoints:/app/checkpoints:ro" \
+  -e CLASSONE_BASE_MODEL=devops-thiago/classone-gemma4-e2b \
+  -v "$HOME/.cache/huggingface:/home/appuser/.cache/huggingface" \
   classone:cpu
 
-# 3. Run parallel load benchmark (5 concurrent worker threads)
+# Optional: verify concurrency against the running container
 python scripts/benchmark_docker_cpu.py --url http://localhost:8000 --concurrency 5 --requests 50
 ```
+
+To use an exported local pre-quantized INT8 `.pt` checkpoint (`classone_cpu_q8.pt`) instead of downloading from Hugging Face on startup, see [`docs/docker_cpu_benchmarks.md`](docs/docker_cpu_benchmarks.md).
+
+---
+
+## Client SDK & HTTP API
+
+- **Python SDK (Published on PyPI):** [`classone`](https://pypi.org/project/classone/) (`pip install classone`) provides `ClassOneClient`, `AsyncClassOneClient`, and typed `Noul`, `Choice`, and `Score` primitives in [`src/classone/sdk`](src/classone/sdk).
+- **HTTP JSON API (`POST /v1/decide`):** Applications in other languages (JavaScript/TypeScript, Go, Rust, Ruby, Java) can integrate directly with the FastAPI endpoint over standard HTTP JSON requests.
 
 ---
 
 ## Evaluation & Benchmark Reproduction
 
 ### 1. Self-Run JevBench v1.6.1 Reproduction (Public Tasks)
-
-Evaluates chance-corrected Intelligence (equal type weighting across Choice, Noul, Score), multi-bin Expected Calibration Error, Speed, and local cost estimation across the 231 public JevBench tasks:
 
 ```bash
 # Evaluate Qwen 3.5 9B locally on GPU:
@@ -213,11 +219,7 @@ python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/
 
 *Public Tiers: Easy 100.0% (48/48), Standard 97.2% (70/72), Hard 56.8% (63/111).*
 
----
-
 ### 2. Decision Index Evaluation Suite (`multimodalart/jev-decision-index`)
-
-Self-run evaluation across all 5 capability domains using the public Decision Index task set (`scores.json` and `index.json` generated locally):
 
 ```bash
 # Evaluate Qwen 3.5 9B locally on GPU:
@@ -238,30 +240,13 @@ python scripts/eval_decision_index.py --mode api --endpoint http://127.0.0.1:800
 | **Rubric & Quality Scoring** | 10.1% | **100.00** | 100.0% (10/10) |
 | **Overall Suite Score (Self-Run)** | **100.0%** | **100.00** | **Overall ECE: 0.0051** |
 
----
-
-### 3. Additional Benchmark Suites & Reproduction Commands
-
-All benchmark evaluation scripts support both local checkpoint paths and Hugging Face Hub identifiers:
+### 3. Additional Benchmark Suites
 
 ```bash
-# 1. JevBench v1.6.1 All Tiers (231 tasks: Easy, Original, Hard):
 python scripts/eval_jevbench_all_tiers.py devops-thiago/classone-qwen3.5-9b --no-lora --pause-tokens 0
-
-# 2. Decision Index Suite (5 domains, local GPU):
-python scripts/eval_decision_index.py --mode local --model-path devops-thiago/classone-qwen3.5-9b --quant none
-
-# 3. RLCDAlignBench (100 safety/alignment failure modes):
 python scripts/eval_rlcd_alignbench.py devops-thiago/classone-qwen3.5-9b --no-lora --pause-tokens 0
-
-# 4. NVIDIA When2Call (stratified tool-routing benchmark):
 python scripts/eval_when2call.py --model devops-thiago/classone-qwen3.5-9b --limit 100 --pause-tokens 0
-
-# 5. Deepset Prompt Injections (adversarial injection defense):
 python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9b --pause-tokens 0
-
-# Verify all published Hugging Face models via SDK:
-python scripts/test_all_hf_models_sdk.py
 ```
 
 ---
@@ -276,29 +261,8 @@ python scripts/test_all_hf_models_sdk.py
 
 ---
 
-## Client SDKs & Package Distribution
-
-ClassOne provides official client libraries across 6 languages with native HTTP transports, zero unnecessary dependencies, and type-safe probabilistic primitives (`Noul`, `Choice`, `Score`):
-
-| Language | Package Registry | Installation / Dependency | Repository |
-|---|---|---|---|
-| **Python** | [PyPI (`classone`)](https://pypi.org/project/classone/) | `pip install classone` | Built-in (`src/classone/sdk`) |
-| **Node.js / TS** | [npm (`@classone/sdk`)](https://www.npmjs.com/package/@classone/sdk) | `npm install @classone/sdk` | [`classone-sdks/nodejs`](https://github.com/devops-thiago/classone-sdks/tree/main/nodejs) |
-| **Go** | [pkg.go.dev](https://pkg.go.dev/github.com/devops-thiago/classone-sdks/go) | `go get github.com/devops-thiago/classone-sdks/go@v0.1.1` | [`classone-sdks/go`](https://github.com/devops-thiago/classone-sdks/tree/main/go) |
-| **Rust** | [crates.io (`classone`)](https://crates.io/crates/classone) | `cargo add classone` | [`classone-sdks/rust`](https://github.com/devops-thiago/classone-sdks/tree/main/rust) |
-| **Java** | [Maven Central (`io.classone:classone-sdk`)](https://central.sonatype.com/artifact/io.classone/classone-sdk) | `implementation 'io.classone:classone-sdk:0.1.1'` | [`classone-sdks/java`](https://github.com/devops-thiago/classone-sdks/tree/main/java) |
-| **Ruby** | [RubyGems (`classone`)](https://rubygems.org/gems/classone) | `gem install classone` | [`classone-sdks/ruby`](https://github.com/devops-thiago/classone-sdks/tree/main/ruby) |
-
-To verify all SDKs against a running server:
-```bash
-python scripts/test_all_sdks_live.py --url http://127.0.0.1:8000
-python scripts/package_and_verify_all_sdks.py
-```
-
----
-
 ## License & Attribution
 
-- Released under the [Apache 2.0 License](LICENSE).
-- **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
-- **Qwen** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen2.5).
+- **Source Code & Python SDK (`src/`, `scripts/`):** Released under the **[Apache License 2.0](LICENSE)** (permissive commercial and open-source use).
+- **Training Curriculum Dataset ([`devops-thiago/classone-system-one-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)):** Released under **[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)** (NonCommercial ShareAlike) because it incorporates upstream non-commercial academic and safety benchmark subsets. Review upstream dataset licenses before commercial retraining.
+- **Base Models:** **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms); **Qwen 3.5** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen2.5).
