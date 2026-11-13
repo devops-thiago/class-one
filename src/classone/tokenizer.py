@@ -90,6 +90,15 @@ class ClassOnePromptBuilder:
             return state.strip()
         return json.dumps(state, indent=2, ensure_ascii=False)
 
+    @staticmethod
+    def _serialize_text_field(value: Any) -> str:
+        """Deterministically serialize str/dict/list/None prompt fields to text."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
     def pack(
         self,
         state: str | dict[str, Any] | list[Any],
@@ -134,7 +143,8 @@ class ClassOnePromptBuilder:
 
         if len(prefix_ids) > 600 and questions:
             instructions_summary = "\n".join(
-                f"- [{qid}]: {getattr(q, 'instructions', '').strip()}" for qid, q in questions.items()
+                f"- [{qid}]: {self._serialize_text_field(getattr(q, 'instructions', None)).strip()}"
+                for qid, q in questions.items()
             )
             preamble_text = f"{d_state_start}\nTarget Objectives:\n{instructions_summary}\n{d_state_end}\n"
             preamble_ids = self.tokenizer.encode(preamble_text, add_special_tokens=True, return_tensors=None)
@@ -156,8 +166,9 @@ class ClassOnePromptBuilder:
             text_parts.append(pause_text)
 
         for q_id, q in questions.items():
+            inst_text = self._serialize_text_field(q.instructions)
             if isinstance(q, NoulQuestion):
-                q_text = f"{d_noul_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n{d_noul_end}\n"
+                q_text = f"{d_noul_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n{d_noul_end}\n"
                 seg_ids = self.tokenizer.encode(q_text, add_special_tokens=False, return_tensors=None)
                 start_offset = len(current_ids)
                 current_ids.extend(seg_ids)
@@ -179,7 +190,7 @@ class ClassOnePromptBuilder:
 
             elif isinstance(q, ChoiceQuestion):
                 # Choice preamble
-                choice_header = f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
+                choice_header = f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n"
                 header_ids = self.tokenizer.encode(choice_header, add_special_tokens=False, return_tensors=None)
                 current_ids.extend(header_ids)
                 text_parts.append(choice_header)
@@ -190,8 +201,13 @@ class ClassOnePromptBuilder:
 
                 for opt_key, opt_desc in q.criteria.items():
                     opt_keys.append(opt_key)
-                    clean_desc = str(opt_desc).strip() if opt_desc is not None else ""
-                    if not clean_desc or clean_desc.lower() == "none":
+                    if opt_desc is None:
+                        clean_desc = ""
+                    elif isinstance(opt_desc, str):
+                        clean_desc = opt_desc.strip()
+                    else:
+                        clean_desc = self._serialize_text_field(opt_desc)
+                    if not clean_desc or (isinstance(opt_desc, str) and clean_desc.lower() == "none"):
                         k_low = str(opt_key).strip().lower()
                         if k_low in ("yes", "true"):
                             clean_desc = "Yes — affirmative, the condition holds."
@@ -234,7 +250,7 @@ class ClassOnePromptBuilder:
                 )
 
             elif isinstance(q, ScoreQuestion):
-                score_header = f"{d_score_start}\nQuestion ID: {q_id}\nInstruction: {q.instructions}\n"
+                score_header = f"{d_score_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n"
                 header_ids = self.tokenizer.encode(score_header, add_special_tokens=False, return_tensors=None)
                 current_ids.extend(header_ids)
                 text_parts.append(score_header)

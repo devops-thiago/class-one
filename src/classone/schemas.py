@@ -13,12 +13,15 @@ from typing import Any, Literal, Union
 
 from pydantic import BaseModel, Field, field_validator
 
+InstructionValue = str | dict[str, Any] | list[Any] | None
+ChoiceCriteriaValue = str | dict[str, Any] | list[Any] | None
+
 
 class NoulQuestion(BaseModel):
     """Boolean yes/no question evaluated to a calibrated probability P(true)."""
 
     type: Literal["noul"] = "noul"
-    instructions: str = Field(..., description="Prompt/instruction for the boolean check.")
+    instructions: InstructionValue = Field(..., description="Prompt/instruction for the boolean check.")
     criteria: dict[str, Any] | None = Field(
         default=None,
         description="Optional explicit true/false or yes/no decision criteria.",
@@ -29,22 +32,22 @@ class ChoiceQuestion(BaseModel):
     """Categorical classification over 2 to 255 options."""
 
     type: Literal["choice"] = "choice"
-    instructions: str = Field(..., description="Prompt/instruction for selecting an option.")
-    criteria: dict[str, str] = Field(
+    instructions: InstructionValue = Field(..., description="Prompt/instruction for selecting an option.")
+    criteria: dict[str, ChoiceCriteriaValue] = Field(
         ...,
         description="Dictionary mapping choice identifier to criteria/definition.",
     )
 
     @field_validator("criteria")
     @classmethod
-    def validate_criteria(cls, v: dict[str, str]) -> dict[str, str]:
+    def validate_criteria(cls, v: dict[str, ChoiceCriteriaValue]) -> dict[str, ChoiceCriteriaValue]:
         if len(v) < 2:
             raise ValueError("Choice question must have at least 2 options.")
         if len(v) > 255:
             raise ValueError("Choice question cannot exceed 255 options.")
-        for key, desc in v.items():
-            if not key or not desc:
-                raise ValueError("Choice keys and descriptions must not be empty.")
+        for key in v:
+            if not key:
+                raise ValueError("Choice keys must not be empty.")
         return v
 
 
@@ -52,7 +55,7 @@ class ScoreQuestion(BaseModel):
     """Ordinal evaluation along an ordered rubric of 2 to 10 levels."""
 
     type: Literal["score"] = "score"
-    instructions: str = Field(..., description="Prompt/instruction for scoring.")
+    instructions: InstructionValue = Field(..., description="Prompt/instruction for scoring.")
     criteria: list[str] = Field(
         ...,
         description="Ordered list of rubric levels from lowest to highest.",
