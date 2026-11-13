@@ -14,10 +14,37 @@ Two publication modes:
 import argparse
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 
 from huggingface_hub import HfApi, create_repo
+
+
+def _infer_base_model(repo_id: str) -> str:
+    """Infers canonical base model identifier from repository name."""
+    rid = repo_id.lower()
+    if "qwen" in rid and "9b" in rid:
+        return "Qwen/Qwen3.5-9B"
+    if "qwen" in rid and "4b" in rid:
+        return "Qwen/Qwen3.5-4B"
+    if "qwen" in rid and "2b" in rid:
+        return "Qwen/Qwen3.5-2B"
+    if "e4b" in rid:
+        return "google/gemma-4-E4B-it"
+    return "google/gemma-4-E2B-it"
+
+
+def _get_git_commit_sha() -> str:
+    """Returns short git commit SHA of the current workspace HEAD, or 'unknown'."""
+    try:
+        return (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+            .decode("utf-8")
+            .strip()
+        )
+    except Exception:
+        return "unknown"
 
 
 def parse_args():
@@ -38,8 +65,8 @@ def parse_args():
     parser.add_argument(
         "--base-model",
         type=str,
-        default="google/gemma-4-E2B-it",
-        help="Base Gemma model ID used during training",
+        default=None,
+        help="Base model ID used during training (auto-inferred from --repo-id if omitted)",
     )
     parser.add_argument(
         "--merge-standalone",
@@ -85,6 +112,17 @@ def parse_args():
         action="store_true",
         help="Update decision heads, tokenizer, and model card without re-uploading base weights",
     )
+    parser.add_argument(
+        "--readme-only",
+        action="store_true",
+        help="Regenerate and upload only README.md to the Hub without touching weights or classone_heads.pt",
+    )
+    parser.add_argument(
+        "--commit-sha",
+        type=str,
+        default=None,
+        help="Git commit SHA to embed in model card self-measurement metadata (defaults to HEAD)",
+    )
     return parser.parse_args()
 
 
@@ -110,15 +148,27 @@ def _resolve_device(name: str) -> str:
     return "cpu"
 
 
-def generate_model_card(repo_id: str, base_model: str, standalone: bool = False) -> str:
-    """Generates a Hugging Face model card with real benchmark results."""
+def generate_model_card(
+    repo_id: str,
+    base_model: str,
+    standalone: bool = False,
+    commit_sha: str | None = None,
+) -> str:
+    """Generates a Hugging Face model card with verified self-measured and official benchmark results."""
     short_name = repo_id.split("/")[-1]
+    sha = commit_sha or _get_git_commit_sha()
+    eval_date = "2026-11-13"
+    hardware_tag = "2x NVIDIA RTX 5060 Ti 16 GB"
+    dtype_expr = "torch.bfloat16" if any(k in repo_id.lower() for k in ("9b", "4b", "e4b")) else "torch.float16"
+    is_qwen = "qwen" in base_model.lower() or "qwen" in repo_id.lower()
+    arch_tag = "qwen" if is_qwen else "gemma"
 
     if standalone:
         intro = (
             f"**[{repo_id}](https://huggingface.co/{repo_id})** is an open-source **System 1 decision model** "
+            f"built on [`{base_model}`](https://huggingface.co/{base_model}) "
             f"using the [ClassOne architecture](https://github.com/devops-thiago/class-one). "
-            f"The full fine-tuned backbone ships directly in this repository — it loads as a single model, "
+            f"The merged standalone backbone ships directly in this repository — it loads as a single model, "
             f"with no adapter and no separate base-model download."
         )
         quickstart = f'''```python
@@ -139,14 +189,14 @@ model = ClassOneModel.from_backbone(
     base_model_name_or_path=REPO_ID,
     tokenizer=tokenizer,
     device="cuda",
-    torch_dtype=torch.float16,
+    torch_dtype={dtype_expr},
 )
 
 # 2. Load the trained decision heads
 heads = torch.load(hf_hub_download(REPO_ID, "classone_heads.pt"), map_location="cuda")
-model.noul_head.load_state_dict(heads["noul_head"])
-model.choice_head.load_state_dict(heads["choice_head"])
-model.score_head.load_state_dict(heads["score_head"])
+model.noul_head.load_state_dict(heads["noul_head"], strict=False)
+model.choice_head.load_state_dict(heads["choice_head"], strict=False)
+model.score_head.load_state_dict(heads["score_head"], strict=False)
 model.eval()
 
 # 3. Pack state + questions and run a single forward pass
@@ -172,11 +222,10 @@ print("Anger score:   ", results["anger"].score)
 ```'''
         files_table = """| File | Description |
 |---|---|
-| `model.safetensors` (sharded) | Merged ClassOne backbone weights |
+| `model.safetensors` (or sharded) | Merged ClassOne standalone backbone weights |
 | `config.json` | Model configuration |
-| `tokenizer.json`, `tokenizer_config.json` | Tokenizer, including ClassOne delimiter tokens |
-| `classone_heads.pt` | Trained Noul / Choice / Score head weights + calibrated temperatures |
-| `lora_backbone/` | LoRA adapter (r=16, α=32) that produced the merged weights |"""
+| `tokenizer.json`, `tokenizer_config.json` | Tokenizer with ClassOne delimiter tokens |
+| `classone_heads.pt` | Trained Noul / Choice / Score head weights + calibrated temperatures |"""
     else:
         intro = (
             f"**[{repo_id}](https://huggingface.co/{repo_id})** is an open-source **System 1 decision model** "
@@ -202,15 +251,15 @@ model = ClassOneModel.from_backbone(
     base_model_name_or_path="{base_model}",
     tokenizer=tokenizer,
     device="cuda",
-    torch_dtype=torch.float16,
+    torch_dtype={dtype_expr},
 )
 model.backbone = PeftModel.from_pretrained(model.backbone, REPO_ID, subfolder="lora_backbone")
 
 # 2. Load the trained decision heads
 heads = torch.load(hf_hub_download(REPO_ID, "classone_heads.pt"), map_location="cuda")
-model.noul_head.load_state_dict(heads["noul_head"])
-model.choice_head.load_state_dict(heads["choice_head"])
-model.score_head.load_state_dict(heads["score_head"])
+model.noul_head.load_state_dict(heads["noul_head"], strict=False)
+model.choice_head.load_state_dict(heads["choice_head"], strict=False)
+model.score_head.load_state_dict(heads["score_head"], strict=False)
 model.eval()
 
 # 3. Pack state + questions and run a single forward pass
@@ -245,30 +294,43 @@ print("Anger score:   ", results["anger"].score)
     is_qwen2b = "qwen" in repo_id.lower() and "2b" in repo_id.lower()
     is_e4b = "e4b" in repo_id.lower()
 
+    provenance_banner = (
+        f"> **Self-Measured Evaluation Provenance:** Executed locally on `{hardware_tag}` "
+        f"(Date: `{eval_date}`, Commit: `{sha}`). See [Official Results (Benchmark Heaven)](#official-results-benchmark-heaven) below for third-party sealed evaluation."
+    )
+
     if is_qwen9b:
-        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+        official_section = """## Official Results (Benchmark Heaven)
 
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+Official third-party evaluation on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([model page: `classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`):
 
-| Metric / Tier | Result | Status |
-|---|---|---|
-| **Composite Score** | **73.28** | **#1 on Benchmark Heaven Leaderboard** |
-| **Intelligence Score** | **81.68** | Leaderboard Rank #1 |
-| **Calibration Score** | **70.09** | 0.0147 ECE on Decision Index |
-| **Speed Score** | **88.93** | 111.5 ms median latency |
+| Metric | Official Benchmark Heaven (`v1.8.8`) |
+|---|---|
+| **Composite Score** | **43.0** (Rank **#113**) |
+| **Intelligence** | **42.2** |
+| **Calibration** | **58.7** |
+| **Capability** | **50.5** (**#155** of 217 open-weights models) |
+
+**Why self-measured local numbers differ from official Benchmark Heaven scores:**
+1. **Sealed vs. public split:** Local self-measurements evaluate strictly the **231 public JevBench tasks**, whereas Benchmark Heaven evaluates both public tasks and private **sealed items**.
+2. **Public/sealed gap penalty:** Benchmark Heaven applies a generalization penalty when performance diverges between public and sealed subsets.
+3. **Strict 10 s rule & latency/cost normalization:** Tasks exceeding 10 seconds are penalized to zero, and speed/cost axes are normalized on server-grade reference GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+        benchmark_section = f"""{provenance_banner}
+
+### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured)
+
+Evaluated standalone on the 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `68FCDB31...`):
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
 | **Easy** | 48 | **100.0%** (48/48) | **0.0029–0.0031** | **0.0000–0.0001** | **112.8 ms** |
-| **Original** | 72 | **97.2%–98.6%** (70–71/72) | **0.0059** | **0.0209–0.0213** | **111.5 ms** |
-| **Hard** | 111 | **59.5%–60.4%** (66–67/111) | 0.2476–0.2537 | 0.2939–0.2946 | **320.1 ms** |
-| **Overall Aggregate** | **231** | **79.7%–80.1%** (184–185/231) | — | — | **112.8 ms** |
+| **Original** | 72 | **97.2%** (70/72) | **0.0057–0.0059** | **0.0209** | **111.5 ms** |
+| **Hard** | 111 | **59.5%** (66/111) | 0.2537 | 0.2946 | **320.1 ms** |
+| **Overall Aggregate (Public)** | **231** | **79.7%** (184/231) | — | — | **112.8 ms** |
 
-- **Easy Tier:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12). Near-zero 0.0029–0.0031 ECE.
-- **Original Tier:** Choice: **97.2%–100.0%** (35–36/36); Score: **100.0%** (12/12); Noul: **95.8%** (23/24); **0.0059 ECE**.
-- **Hard Tier:** Choice: **61.2%** (41/67); Noul: **55.3%** (21/38); Score: **66.7%** (4/6).
+### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+Self-run local evaluation across the 50 tasks from [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`{hardware_tag}`):
 
 | Domain | Tasks | Accuracy (%) |
 |---|---|---|
@@ -277,11 +339,11 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Retrieval** | 10 | **100.0%** (10/10) |
 | **Rubric** | 10 | **100.0%** (10/10) |
 | **Tools** | 10 | **100.0%** (10/10) |
-| **Overall Decision Index** | **50** | **100.0%** (50/50, 0.0138–0.0152 ECE) |
+| **Overall Suite Score** | **50** | **100.0%** (50/50, 0.0138–0.0152 ECE) |
 
-### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured)
 
-Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+Self-measured across the 10 alignment failure modes in [RLCDAlignBench](https://huggingface.co/datasets/sumleo/RLCDAlignBench) (`arXiv:2609.29429`, `{hardware_tag}`):
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -293,10 +355,10 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 | **Social Bias** | 9 | **0.675** | **55.6%** | 0.4213 | 738.2 ms |
 | **Prompt Injection** | 8 | **0.625** | **50.0%–62.5%** | 0.4695 | 584.6 ms |
 | **Privacy** | 14 | **0.612** | **50.0%** | 0.3584 | 570.0 ms |
-| **Sycophancy** | 9 | **0.250–0.300** | **44.4%** | 0.6490 | 667.8 ms |
+| **Sycophancy** | 9 | 0.250–0.300 | **44.4%** | 0.6490 | 667.8 ms |
 | **Overall Balanced Accuracy** | **100** | **0.623** | **65.1%** | **0.3240** | **694.7 ms** |
 
-### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured)
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -304,22 +366,29 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 | **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **89.00%** (89.10% BalAcc) | **0.9607 AUROC** (**84.1%** Adversarial, **91.7%** Benign Spec) | **0.0700** | 108.9 ms |
 | **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **71.55%–72.41%** (83–84/116) | **0.7902 AUROC** (**96.4%** Benign Spec, **48.3%–50.0%** Recall) | 0.2478 | 106.5 ms |"""
     elif is_qwen4b:
-        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+        official_section = """## Official Results (Benchmark Heaven)
 
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+        benchmark_section = f"""{provenance_banner}
+
+### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
+
+Evaluated standalone (`--bf16 --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `654DA038...`):
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0257** | **0.0094** | **63.3 ms** |
-| **Original** | 72 | **95.8%** (69/72) | **0.0481** | **0.0352** | **62.9 ms** |
-| **Hard** | 111 | **52.2%** (58/111) | 0.3099 | 0.3424 | **211.2 ms** |
-| **Overall Aggregate** | **231** | **75.8%** (175/231) | — | — | **63.3 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0266** | **0.0093** | **150.8 ms** |
+| **Original** | 72 | **95.8%** (69/72) | **0.0385** | **0.0342** | **157.1 ms** |
+| **Hard** | 111 | **52.3%** (58/111) | 0.3177 | 0.3451 | **475.6 ms** |
+| **Overall Aggregate (Public)** | **231** | **75.8%** (175/231) | — | — | **157.1 ms** |
 
-- **Easy Tier Sub-Breakdown:** Choice: **100.0%** (36/36); Noul policy: **100.0%** (12/12). Flawless 100%.
-- **Original Tier Sub-Breakdown:** Noul: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice: **91.7%** (33/36).
-- **Hard Tier Sub-Breakdown:** Choice: **52.2%** (35/67); Noul: **52.6%** (20/38); Score: **50.0%** (3/6).
+- **Easy Tier Sub-Breakdown:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12).
+- **Original Tier Sub-Breakdown:** Noul: **100.0%** (24/24); Score: **100.0%** (12/12); Choice: **91.7%** (33/36).
+- **Hard Tier Sub-Breakdown:** Noul: **55.3%** (21/38); Choice: **52.2%** (35/67); Score: **33.3%** (2/6).
 
-### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+### 2. Decision Index Suite (Self-Run, 50 Tasks)
+
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`, `{hardware_tag}`):
 
 | Domain | Weight | Accuracy (%) | Score |
 |---|---|---|---|
@@ -328,146 +397,149 @@ Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://gith
 | **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
 | **Tools & Execution Guardrails** | 18.3% | **100.0%** (10/10) | 100.00 pts |
 | **Rubric & Quality Scoring** | 10.1% | **90.0%** (9/10) | 90.00 pts |
-| **Overall Decision Index** | **100.0%** | **98.0%** (49/50) | **98.99 / 100.00** (0.0317 ECE) |
+| **Overall Weighted Score** | **100.0%** | **98.0%** (49/50) | **98.99 / 100.00** (0.0333 ECE, 178.7 ms p50) |
 
-### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone BF16)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **Power Seeking** | 6 | **0.889** | **83.3%** | 0.2008 | 520.1 ms |
-| **Faithfulness** | 9 | **0.850** | **77.8%** | 0.2895 | 513.4 ms |
-| **Honesty (Deception)** | 11 | **0.833** | **63.6%** | 0.2482 | 536.0 ms |
-| **Refusal (Jailbreaks)** | 11 | **0.600** | **45.5%** | 0.3167 | 670.6 ms |
-| **Overall Balanced Accuracy** | **100** | **0.562** | **51.5%** | **0.3101** | **487.9 ms** |
+| **Power Seeking** | 6 | **0.889** | **66.7%** | 0.2187 | 1036.6 ms |
+| **Faithfulness** | 9 | **0.900** | **77.8%** | 0.2913 | 1093.4 ms |
+| **Honesty (Deception)** | 11 | **0.833** | **63.6%** | 0.2473 | 1109.4 ms |
+| **Refusal (Jailbreaks)** | 11 | **0.600** | **45.5%** | 0.3237 | 1373.8 ms |
+| **Overall Balanced Accuracy** | **100** | **0.572** | **51.5%** | **0.3385** | **1051.6 ms** |
 
-### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone)
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **89.00%** (89.10% BalAcc) | **0.9441 AUROC** (**94.6%** Vanilla, **81.8%** Adversarial) | **0.0895** | 100.4 ms |
-| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **77.59%** (90/116) | **0.8388 AUROC** (**91.1%** Benign Spec, **65.0%** Recall) | 0.1684 | 64.3 ms |
-| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **33.00%** | **97.1%** `tool_call` (33/34) | 0.5928 | 288.8 ms |"""
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified, 4-bit) | **89.00%** (88.94% BalAcc) | **0.9335 AUROC** (**91.07%** Vanilla, **86.36%** Adversarial) | **0.0840** | 231.9 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full, BF16) | **57.76%** (67/116) | **0.7619 AUROC** (**100.0%** Benign Spec, **18.3%** Recall) | 0.3825 | 141.1 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified, BF16) | **35.00%** | **88.2%** `tool_call` (30/34), **11.9%** `cannot_answer` | 0.4188 | 546.4 ms |"""
     elif is_qwen2b:
-        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+        official_section = """## Official Results (Benchmark Heaven)
 
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+        benchmark_section = f"""{provenance_banner}
+
+### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone FP16)
+
+Evaluated standalone (`--no-quant --no-lora --pause-tokens 0`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`, heads SHA256 `BD24D863...`):
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **95.8%** (46/48) | **0.0064** | **0.0042** | **40.1 ms** |
-| **Original** | 72 | **88.9%** (64/72) | **0.0612** | **0.0489** | **39.8 ms** |
-| **Hard** | 111 | **47.7%** (53/111) | 0.4120 | 0.3890 | **78.4 ms** |
-| **Overall Aggregate** | **231** | **69.7%** (161/231) | — | — | **39.8 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0500** | **0.0118** | **108.8 ms** |
+| **Original** | 72 | **83.3%** (60/72) | **0.0579** | **0.1338** | **94.7 ms** |
+| **Hard** | 111 | **47.7%** (53/111) | 0.2761 | 0.3066 | **246.9 ms** |
+| **Overall Aggregate (Public)** | **231** | **69.7%** (161/231) | — | — | **108.8 ms** |
 
-- **Hard Choice Surge:** Hard Choice surged to **49.3%** (33/67, up +15.0 pp from 34.3%).
-- **Latency Advantage:** **39.8 ms median latency** across real-time decisions.
+- **Original Tier Sub-Breakdown:** Noul: **91.7%** (22/24); Choice: **80.6%** (29/36); Score: **75.0%** (9/12).
+- **Hard Tier Sub-Breakdown:** Noul: **47.4%** (18/38); Choice: **49.3%** (33/67); Score: **33.3%** (2/6).
 
-### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
+### 2. Decision Index Suite (Self-Run, 50 Tasks)
+
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`--quant none`, `{hardware_tag}`):
 
 | Domain | Weight | Accuracy (%) | Score |
 |---|---|---|---|
 | **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
-| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
-| **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
-| **Tools & Execution Guardrails** | 18.3% | **100.0%** (10/10) | 100.00 pts |
-| **Rubric & Quality Scoring** | 10.1% | **70.0%** (7/10) | 64.44 pts |
-| **Overall Decision Index** | **100.0%** | **94.0%** (47/50) | **96.41 / 100.00** (0.0477 ECE) |
-
-### 3. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
-
-| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
-|---|---|---|---|---|---|
-| **Faithfulness** | 9 | **0.800** | **55.6%** | 0.3486 | 184.2 ms |
-| **Honesty (Deception)** | 11 | **0.767** | **72.7%** | 0.2207 | 188.9 ms |
-| **Concealing Uncertainty** | 14 | **0.571** | **64.3%** | 0.3795 | 115.3 ms |
-| **Overall Balanced Accuracy** | **100** | **0.568** | **51.0%** | **0.3261** | **173.2 ms** |
-
-### 4. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
-
-| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
-|---|---|---|---|---|---|
-| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **80.00%** (79.41% BalAcc) | **0.8798 AUROC** (**94.2%** Harm Recall, **89.3%** Vanilla) | 0.1746 | 59.4 ms |
-| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **73.28%** (85/116) | **0.8110 AUROC** (**80.4%** Benign Spec, **66.7%** Recall) | 0.1942 | 47.5 ms |
-| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **32.00%** | **91.2%** `tool_call` (31/34) | 0.4763 | 115.1 ms |"""
-    elif is_e4b:
-        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
-
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
-
-| Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
-|---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0009** | **0.0000** | **118.4 ms** |
-| **Original** | 72 | **95.8%** (69/72) | **0.0236** | **0.0328** | **117.3 ms** |
-| **Hard** | 111 | **45.9%** (51/111) | 0.3785 | 0.3500 | **253.4 ms** |
-| **Overall Aggregate** | **231** | **72.7%** (168/231) | — | — | **117.3 ms** |
-
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 100%.
-- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **91.7%** (33/36).
-- **Hard Tier Sub-Breakdown:** Choice accuracy: **46.3%** (31/67); Noul policy compliance: **47.4%** (18/38); Score: **33.3%** (2/6).
-
-### 2. Hugging Face Decision Index (50 Public Multi-Domain Tasks)
-
-| Domain | Weight | Accuracy (%) | Score |
-|---|---|---|---|
-| **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
-| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Language & Policy Contracts** | 25.8% | **90.0%** (9/10) | 90.00 pts |
 | **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
 | **Tools & Execution Guardrails** | 18.3% | **90.0%** (9/10) | 90.00 pts |
 | **Rubric & Quality Scoring** | 10.1% | **90.0%** (9/10) | 90.00 pts |
-| **Overall Decision Index** | **100.0%** | **94.0%** (47/50) | **97.16 / 100.00** (0.0312 ECE) |
+| **Overall Weighted Score** | **100.0%** | **94.0%** (47/50) | **94.58 / 100.00** (0.0561 ECE, 94.4 ms p50) |
 
-### 3. Prompt Injection Benchmark (deepset/prompt-injections, 116 Instances)
-
-| Metric | Result |
-|---|---|
-| **Overall Binary Accuracy** | **63.79%** (74/116) |
-| **Benign Specificity (TN)** | **96.4%** (54/56) |
-| **Injection Recall (TP)** | **33.3%** (20/60) |
-| **AUROC** | **0.7499** |
-| **Latency p50** | **106.4 ms** |
-
-### 4. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
-
-Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone FP16)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **Refusal (Jailbreaks)** | 11 | 0.433 | **72.7%** | 0.3272 | 622.8 ms |
-| **Honesty (Deception)** | 11 | **0.567** | **72.7%** | 0.2531 | 464.9 ms |
-| **Reward Hacking** | 9 | **0.650** | **66.7%** | 0.3074 | 444.8 ms |
-| **Faithfulness** | 9 | **0.600** | **66.7%** | 0.3005 | 440.3 ms |
-| **Power Seeking** | 6 | **0.556** | **66.7%** | 0.1434 | 449.7 ms |
-| **Privacy (Secret Leaks)** | 14 | **0.571** | **64.3%** | 0.3666 | 353.1 ms |
-| **Concealing Uncertainty** | 14 | **0.510** | **64.3%** | 0.3784 | 288.6 ms |
-| **Bias** | 9 | 0.225 | **55.6%** | 0.1921 | 465.0 ms |
-| **Overall Balanced Accuracy** | **100** | **0.583** | **63.3%** | **0.2874** | **425.9 ms** |
+| **Honesty (Deception)** | 11 | **0.800** | **72.7%** | 0.2922 | 478.1 ms |
+| **Faithfulness** | 9 | **0.750** | **66.7%** | 0.3475 | 504.5 ms |
+| **Social Bias** | 9 | **0.525** | **55.6%** | 0.3164 | 489.3 ms |
+| **Refusal (Jailbreaks)** | 11 | 0.500 | **54.5%** | 0.3775 | 596.2 ms |
+| **Overall Balanced Accuracy** | **100** | **0.520** | **50.9%** | **0.2646** | **450.3 ms** |
 
-### 5. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone FP16)
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
-| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **84.00%** (84.46% BalAcc) | **0.9217 AUROC** (**95.8%** Benign Spec, **81.8%** Adversarial) | **0.1298** | 132.7 ms |
-| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **63.79%** (74/116) | **0.6229 AUROC** (**98.2%** Benign Spec) | 0.2814 | 81.5 ms |
-| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **43.00%** | **94.1%** `tool_call`, **29.2%** `request_for_info` | 0.4017 | 305.3 ms |"""
-    else:
-        benchmark_section = """### 1. JevBench Public Multi-Tier Benchmark (231 Public Tasks)
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **83.00%** (82.69% BalAcc) | **0.8856 AUROC** (**90.38%** Harm Recall, **83.93%** Vanilla) | 0.1075 | 98.1 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **51.72%** (60/116) | **0.8232 AUROC** (**100.0%** Benign Spec, **6.7%** Recall) | 0.4182 | 101.4 ms |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **36.00%** | **94.1%** `tool_call` (32/34) | 0.3324 | 272.7 ms |"""
+    elif is_e4b:
+        official_section = """## Official Results (Benchmark Heaven)
 
-Evaluated across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench):
+Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+        benchmark_section = f"""{provenance_banner}
+
+### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone BF16)
+
+Evaluated standalone (Pillar 3A promoted release, heads SHA256 `8F7157F4...`) across all 231 public tasks in [fstandhartinger/jevbench](https://github.com/fstandhartinger/jevbench) (`{hardware_tag}`):
 
 | Tier | Tasks | Accuracy | ECE | Brier Score | Median Latency (p50) |
 |---|---|---|---|---|---|
-| **Easy** | 48 | **100.0%** (48/48) | **0.0064** | **0.0009** | **44.8 ms** |
-| **Original** | 72 | **90.3%** (65/72) | **0.0972** | **0.1015** | **42.9 ms** |
-| **Hard** | 111 | **44.1%** (49/111) | 0.4681 | 0.4813 | **90.0 ms** |
-| **Overall Aggregate** | **231** | **70.1%** (162/231) | - | - | **44.8 ms** |
+| **Easy** | 48 | **100.0%** (48/48) | **0.0022** | **0.0000** | **97.1 ms** |
+| **Original** | 72 | **97.2%** (70/72) | **0.0209** | **0.0264** | **95.1 ms** |
+| **Hard** | 111 | **45.9%** (51/111) | 0.3637 | 0.3659 | **195.8 ms** |
+| **Overall Aggregate (Public)** | **231** | **73.2%** (169/231) | — | — | **97.1 ms** |
 
-- **Easy Tier Sub-Breakdown:** Choice accuracy: **100.0%** (36/36); Noul policy accuracy: **100.0%** (12/12). Flawless 0.0064 ECE.
-- **Original Tier Sub-Breakdown:** Noul accuracy: **100.0%** (24/24); Score rubrics: **100.0%** (12/12); Choice accuracy: **80.6%** (29/36).
-- **Hard Tier Sub-Breakdown:** Noul policy compliance: **52.6%** (20/38); Choice accuracy: **43.3%** (29/67).
+- **Easy Tier Sub-Breakdown:** Choice: **100.0%** (36/36); Noul: **100.0%** (12/12).
+- **Original Tier Sub-Breakdown:** Noul: **100.0%** (24/24); Score: **100.0%** (12/12); Choice: **94.4%** (34/36).
+- **Hard Tier Sub-Breakdown:** Choice: **47.8%** (32/67); Noul: **44.7%** (17/38); Score: **33.3%** (2/6).
 
-### 2. RLCDAlignBench Alignment & Safety Evaluation (100 Instances)
+### 2. Decision Index Suite (Self-Run, 50 Tasks)
 
-Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
+Self-run local evaluation on [`multimodalart/jev-decision-index`](https://huggingface.co/datasets/multimodalart/jev-decision-index) (`{hardware_tag}`):
+
+| Domain | Weight | Accuracy (%) | Score |
+|---|---|---|---|
+| **Knowledge & Verification** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Language & Policy Contracts** | 25.8% | **100.0%** (10/10) | 100.00 pts |
+| **Retrieval & Relevance Triage** | 20.0% | **100.0%** (10/10) | 100.00 pts |
+| **Tools & Execution Guardrails** | 18.3% | **100.0%** (10/10) | 100.00 pts |
+| **Rubric & Quality Scoring** | 10.1% | **90.0%** (9/10) | 90.00 pts |
+| **Overall Weighted Score** | **100.0%** | **98.0%** (49/50) | **98.99 / 100.00** (0.0379 ECE, 99.6 ms p50) |
+
+### 3. RLCDAlignBench Alignment & Safety Suite (100 Instances, Self-Measured Standalone)
+
+| Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **Power Seeking** | 6 | **0.889** | **83.3%** | — | — |
+| **Honesty (Deception)** | 11 | **0.633** | **72.7%** | — | — |
+| **Reward Hacking** | 9 | **0.650** | **66.7%** | — | — |
+| **Faithfulness** | 9 | **0.650** | **66.7%** | — | — |
+| **Social Bias** | 9 | 0.475 | **55.6%** | — | — |
+| **Sycophancy** | 9 | 0.500 | **55.6%** | — | — |
+| **Refusal (Jailbreaks)** | 11 | 0.433 | **54.5%** | — | — |
+| **Privacy (Secret Leaks)** | 14 | **0.612** | **50.0%** | — | — |
+| **Prompt Injection** | 8 | **0.625** | **50.0%** | — | — |
+| **Concealing Uncertainty** | 14 | 0.469 | **50.0%** | — | — |
+| **Overall Balanced Accuracy** | **100** | **0.601** | **59.4%** (59.0% Acc) | **0.2235** | **411.1 ms** |
+
+### 4. Tool-Routing & Safety Guardrail Suites (Self-Measured Standalone)
+
+| Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
+|---|---|---|---|---|---|
+| **WildGuardTest** (`walledai/WildGuardTest`) | `test` (100 stratified) | **84.00%** (84.54% BalAcc) | **0.9233 AUROC** (**97.92%** Benign Spec, **81.82%** Adversarial) | 0.1563 | 84.6 ms |
+| **Deepset Prompt Injections** (`deepset/prompt-injections`) | `test` (116 full) | **83.62%** (97/116) | **0.9430 AUROC** (**100.0%** Benign Spec, **68.33%** Recall) | **0.1503** | **56.1 ms** |
+| **NVIDIA When2Call** (`nvidia/When2Call`) | `mcq` (100 stratified) | **79.00%** | **87.5%** `request_for_info`, **78.6%** `cannot_answer`, **73.5%** `tool_call` | **0.0796** | 218.5 ms |"""
+    else:
+        official_section = """## Official Results (Benchmark Heaven)
+
+Official third-party leaderboards are hosted at **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** (see e.g. [`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b) for `v1.8.8` scoring). Official Benchmark Heaven scores differ from local self-measurements because the official harness evaluates private **sealed items** in addition to the public suite, applies a public/sealed generalization gap penalty, enforces a strict 10-second cutoff rule, and measures latency/cost on server-grade GPUs rather than local workstation hardware (`2x NVIDIA RTX 5060 Ti 16 GB`)."""
+        benchmark_section = f"""{provenance_banner}
+
+> **Tokenizer Compatibility Note (`commit 86988ca` / SDK `v0.2.0–v0.2.3`):** The standalone weights in this repository were trained with custom delimiter tokens (`<|state_start|>=262144..262155`) serialized in `tokenizer.json`. Later SDK releases (`v0.2.0–v0.2.3`) prioritize Gemma 4 `<unused0>..` reserved tokens when present; with native `<|state_start|>=262144` formatting, these weights + rolled-back `classone_heads.pt` (`F6A6E423...`) achieve **69.3%** (160/231) on JevBench (whereas default `<unused0>` formatting scores **58.4%** / 135/231).
+
+### 1. JevBench Public Multi-Tier Suite (231 Public Tasks, Self-Measured Standalone)
+
+| Evaluation Regime | Overall (231) | Easy (48) | Original (72) | Hard (111) |
+|---|---|---|---|---|
+| **Current Hub Weights + Rolled-Back Heads (`F6A6E423...`, Native `<\\|state_start\\|>`)** | **69.3%** (160/231) | **93.8%** (45/48) | **88.9%** (64/72) | **45.9%** (51/111) |
+| **Original Milestone Snapshot (`best_composite_70pct_milestone`, 2026-10-06)** | **70.1%** (162/231) | **100.0%** (48/48, 0.0064 ECE) | **90.3%** (65/72, 0.0972 ECE) | **44.1%** (49/111) |
+| **Current Hub Weights under SDK `v0.2.0–v0.2.3` (`<unused0>`)** | 58.4% (135/231) | 91.7% (44/48) | 70.8% (51/72) | 36.0% (40/111) |
+
+### 2. RLCDAlignBench Alignment & Safety Suite (100 Instances, 2026-10-06 Snapshot)
 
 | Failure Mode / Axis | Samples (N) | AUROC | Accuracy (%) | ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -479,7 +551,7 @@ Evaluated across the 10 core AI alignment failure modes (arXiv:2609.29429):
 | **Bias** | 9 | **0.525** | **55.6%** | 0.2141 | 217.9 ms |
 | **Overall Balanced Accuracy** | **100** | **0.505** | **56.2%** | **0.1944** | **199.2 ms** |
 
-### 3. Agentic Tool-Routing & Adversarial Safety Suites (2026 Benchmarks)
+### 3. Tool-Routing & Safety Guardrail Suites (Self-Measured)
 
 | Benchmark Suite | Split / Samples | Accuracy | Secondary Metric | Calibration ECE | Latency (p50) |
 |---|---|---|---|---|---|
@@ -495,7 +567,7 @@ tags:
   - system-1
   - rlcd
   - proper-scoring-rules
-  - gemma
+  - {arch_tag}
   - classone
   - classification
 pipeline_tag: text-classification
@@ -507,15 +579,17 @@ pipeline_tag: text-classification
 
 Instead of generating text token by token, ClassOne evaluates structured decisions in a **single forward pass**, returning typed, calibrated outputs with zero decoding overhead.
 
-## Benchmark Results
+## Self-Measured Benchmark Results
 
 {benchmark_section}
 
-### 3. Edge vs Cloud Latency (ClassOne vs TypeSafe Jev API)
+{official_section}
 
-Measured against TypeSafe AI's Jev (v1.13) cloud API:
+## Edge vs Cloud Latency (Self-Measured Comparison)
+
+Measured against a remote cloud LLM decision API round-trip:
 - **ClassOne (Local RTX 5060 Ti):** **52.49 ms** mean latency (19.1 req/s, $0.00 inference cost, 100% private)
-- **TypeSafe Jev (Cloud API):** **329.90 ms** mean latency (3.0 req/s)
+- **Cloud API Baseline:** **329.90 ms** mean latency (3.0 req/s)
 - **Edge Speedup:** **6.3× faster** than cloud API round-trip latency
 
 ## Decision Primitives
@@ -524,8 +598,7 @@ Measured against TypeSafe AI's Jev (v1.13) cloud API:
 - **`Choice`** — Categorical selection over 2–255 dynamic options with full probability distribution
 - **`Score`** — Continuous ordinal rubric rating over 2–10 levels (expected value)
 
-All outputs are calibrated with a combined NLL + normalized Brier loss.
-Post-hoc temperature calibration achieves **ECE = 0.034** (down from 0.178).
+All outputs are calibrated with a combined NLL + normalized Brier loss and post-hoc temperature scaling.
 
 ## Quickstart
 
@@ -552,7 +625,7 @@ pip install classone
 
 ## Attribution & Legal
 
-- Derived from [{base_model}](https://huggingface.co/{base_model}) ({"Alibaba Cloud (Qwen Team)" if "qwen" in base_model.lower() else "Google"}) — Apache License 2.0
+- Derived from [{base_model}](https://huggingface.co/{base_model}) ({"Alibaba Cloud (Qwen Team)" if is_qwen else "Google"}) — Apache License 2.0
 - Architecture & training code: [devops-thiago/class-one](https://github.com/devops-thiago/class-one) — Apache 2.0
 """
 
@@ -643,10 +716,11 @@ def merge_and_export(
         device_map=device,
         token=token,
     )
-    try:
-        base.resize_token_embeddings(len(tokenizer), mean_resizing=False)
-    except TypeError:
-        base.resize_token_embeddings(len(tokenizer))
+    if len(tokenizer) > base.get_input_embeddings().weight.shape[0]:
+        try:
+            base.resize_token_embeddings(len(tokenizer), mean_resizing=False)
+        except TypeError:
+            base.resize_token_embeddings(len(tokenizer))
 
     print(f"[*] Attaching LoRA adapter from {adapter_source} ...")
     peft_model = PeftModel.from_pretrained(base, adapter_source, subfolder=adapter_subfolder, token=token)
@@ -674,9 +748,12 @@ def merge_and_export(
 
 def main():
     args = parse_args()
+    if not args.base_model:
+        args.base_model = _infer_base_model(args.repo_id)
 
-    if not args.merge_standalone and not args.checkpoint_dir:
-        print("[!] Error: --checkpoint-dir is required unless --merge-standalone is set.")
+    readme_only = getattr(args, "readme_only", False)
+    if not args.merge_standalone and not readme_only and not args.checkpoint_dir:
+        print("[!] Error: --checkpoint-dir is required unless --merge-standalone or --readme-only is set.")
         sys.exit(1)
 
     token = args.token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
@@ -693,7 +770,7 @@ def main():
         sys.exit(1)
 
     heads_path = os.path.join(args.checkpoint_dir, "classone_heads.pt") if args.checkpoint_dir else None
-    if not args.merge_standalone and not (heads_path and os.path.exists(heads_path)):
+    if not args.merge_standalone and not readme_only and not (heads_path and os.path.exists(heads_path)):
         print(f"[!] Error: Decision heads not found in {args.checkpoint_dir}")
         sys.exit(1)
 
@@ -714,6 +791,24 @@ def main():
     except Exception as exc:
         print(f"[!] Failed to create/verify repository: {exc}")
         sys.exit(1)
+
+    if readme_only:
+        print(f"\n[*] Updating README.md only on {args.repo_id} (preserving weights & heads)...")
+        card = generate_model_card(
+            args.repo_id,
+            args.base_model,
+            standalone=True,
+            commit_sha=args.commit_sha,
+        )
+        api.upload_file(
+            path_or_fileobj=card.encode("utf-8"),
+            path_in_repo="README.md",
+            repo_id=args.repo_id,
+            token=token,
+            commit_message="Update model card metadata and benchmark provenance",
+        )
+        print("      ✓ README.md")
+        return
 
     if args.merge_standalone:
         _publish_standalone(api, args, token)
@@ -757,7 +852,10 @@ def _publish_adapter(api: HfApi, args, token: str):
     print("\n[3/3] Uploading model card (README.md)...")
     api.upload_file(
         path_or_fileobj=generate_model_card(
-            args.repo_id, args.base_model, standalone=bool(args.update_heads_only)
+            args.repo_id,
+            args.base_model,
+            standalone=bool(args.update_heads_only),
+            commit_sha=args.commit_sha,
         ).encode("utf-8"),
         path_in_repo="README.md",
         repo_id=args.repo_id,
@@ -835,11 +933,16 @@ def _publish_standalone(api: HfApi, args, token: str):
 
         print("\n[3/3] Uploading model card (README.md)...")
         api.upload_file(
-            path_or_fileobj=generate_model_card(args.repo_id, args.base_model, standalone=True).encode("utf-8"),
+            path_or_fileobj=generate_model_card(
+                args.repo_id,
+                args.base_model,
+                standalone=True,
+                commit_sha=args.commit_sha,
+            ).encode("utf-8"),
             path_in_repo="README.md",
             repo_id=args.repo_id,
             token=token,
-            commit_message="Update model card with official benchmark records",
+            commit_message="Update model card metadata and benchmark provenance",
         )
         print("      ✓ README.md")
         return
@@ -891,6 +994,7 @@ def _publish_standalone(api: HfApi, args, token: str):
         folder_path=workdir,
         repo_id=args.repo_id,
         token=token,
+        ignore_patterns=["README.md"],
         commit_message="Publish merged standalone ClassOne model",
     )
 
@@ -910,7 +1014,12 @@ def _publish_standalone(api: HfApi, args, token: str):
         print("\n[3/3] Uploading model card (decision heads already on the Hub) ...")
 
     api.upload_file(
-        path_or_fileobj=generate_model_card(args.repo_id, args.base_model, standalone=True).encode("utf-8"),
+        path_or_fileobj=generate_model_card(
+            args.repo_id,
+            args.base_model,
+            standalone=True,
+            commit_sha=args.commit_sha,
+        ).encode("utf-8"),
         path_in_repo="README.md",
         repo_id=args.repo_id,
         token=token,

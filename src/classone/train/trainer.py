@@ -116,6 +116,8 @@ class ClassOneTrainer:
 
         # Apply LoRA to the backbone
         self.model.backbone = get_peft_model(self.model.backbone, lora_config)
+        if is_quantized and hasattr(self.model.backbone, "enable_input_require_grads"):
+            self.model.backbone.enable_input_require_grads()
 
         # Ensure decision heads remain trainable
         for head in [
