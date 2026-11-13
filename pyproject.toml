@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "classone"
-version = "0.2.3"
+version = "0.2.4"
 description = "Open-source System 1 decision model architecture built on Gemma 4 and Qwen 3.5"
 readme = "README.md"
 authors = [{ name = "Thiago Gonzaga" }]
