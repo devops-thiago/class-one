@@ -27,6 +27,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Verify README heads SHA256 match Hugging Face Hub before release
+        env:
+          PYTHONPATH: src
+        run: uv run --no-project --python 3.11 --with huggingface_hub python scripts/verify_hub_heads_sha.py
+
       - name: Build sdist and wheel
         run: uv build
 

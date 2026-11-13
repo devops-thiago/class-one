@@ -107,6 +107,32 @@ def validate_markdown_attribution(
     return errors
 
 
+README_HASH_ROW_RE = re.compile(
+    r"^\|\s*\[`([^`]+)`\]\([^)]+\)\s*\|[^|]*\|[^|]*\|\s*`([0-9A-Fa-f]{64})`\s*\|",
+)
+
+
+def parse_readme_heads_hashes(readme_text: str) -> dict[str, str]:
+    """Parses the 'Calibrated Heads SHA256 (Verified on Hub)' table from README.md."""
+    parsed: dict[str, str] = {}
+    for line in readme_text.splitlines():
+        match = README_HASH_ROW_RE.match(line.strip())
+        if match:
+            repo_id, sha256_hex = match.groups()
+            parsed[repo_id.strip()] = sha256_hex.upper()
+    return parsed
+
+
+def get_registered_heads_sha256(repo_id: str, registry: dict[str, Any] | None = None) -> str | None:
+    """Returns the canonical uppercase SHA256 digest for repo_id from baselines.json."""
+    try:
+        data = registry if registry is not None else load_baseline_registry()
+    except OSError:
+        return None
+    sha = data.get("models", {}).get(repo_id, {}).get("heads_sha256")
+    return str(sha).strip().upper() if sha else None
+
+
 def _normalize_rate(value: float, metric_name: str) -> float:
     """Normalizes percentage inputs (0..100) for fractional metrics when needed."""
     if metric_name in {"jevbench_public_acc", "rlcd_alignbench_bal_acc"} and value > 1.0:
