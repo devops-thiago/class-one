@@ -6,7 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/classone)](https://pypi.org/project/classone/)
 [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)
 
-**ClassOne (Classifier One)** attaches calibrated single-pass decision heads (`Noul`, `Choice`, `Score`) onto open-weight language models (`Qwen 3.5` and `Gemma 4`). Instead of decoding JSON or explanatory prose token by token, a model evaluates structured booleans, multi-option routing, and ordinal rubrics in **one forward pass** with probabilities calibrated by strictly proper scoring rules (NLL + Brier + margin loss + temperature scaling). Use it directly via the Python SDK and FastAPI server or load the merged standalone checkpoints from Hugging Face.
+**ClassOne (Classifier One)** attaches calibrated single-pass decision heads (`Noul`, `Choice`, `Score`) onto open-weight language models (`Qwen 3.5` and `Gemma 4`). Instead of decoding JSON or explanatory prose token by token, a model evaluates structured booleans, multi-option routing, and ordinal rubrics in **one forward pass** with probabilities calibrated by strictly proper scoring rules (Focal NLL [γ=2.0] + Brier + margin loss + temperature scaling). Use it directly via the Python SDK and FastAPI server or load the merged standalone checkpoints from Hugging Face.
 
 ---
 
@@ -45,9 +45,9 @@ with ClassOneClient(base_url="http://127.0.0.1:8000") as client:
         },
     )
 
-print("Refund P(true):", res.nouls["refund"].noul)
-print("Route Choice:", res.choices["route"].choice, "margin:", res.choices["route"].margin)
-print("Urgency Score:", res.scores["urgency"].score)
+    print("Refund P(true):", res.nouls["refund"].noul)
+    print("Route Choice:", res.choices["route"].choice, "margin:", res.choices["route"].margin)
+    print("Urgency Score:", res.scores["urgency"].score)
 ```
 
 ---
@@ -72,7 +72,7 @@ print("Urgency Score:", res.scores["urgency"].score)
 
 ### Official Third-Party Evaluation (Benchmark Heaven)
 
-Independent third-party evaluation is hosted on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), benchmark version `v1.8.8`, checked `2026-11-13`):
+Independent third-party evaluation is hosted on **[Benchmark Heaven](https://benchmarkheaven.com/jev-models)** ([`classone-qwen3.5-9b`](https://benchmarkheaven.com/jev-models/classone-qwen3.5-9b), JevBench `v1.8.10` / method `v1.7`, published `2026-11-12`):
 
 | Model | Composite Score | Intelligence | Calibration | Capability | Source |
 | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -210,14 +210,14 @@ python scripts/eval_jevbench_v16.py --mode api --endpoint http://127.0.0.1:8000/
 
 | Axis | Weight | Score (0–100) | Metric Details |
 | :--- | :---: | :---: | :--- |
-| **Composite Score (Self-Run)** | **100%** | **73.48** | Equal-weight 4-axis Harmonic Mean (see Benchmark Heaven above for official `v1.8.8` scores) |
+| **Composite Score (Self-Run)** | **100%** | **73.48** | Equal-weight 4-axis Harmonic Mean (see Benchmark Heaven above for official JevBench `v1.8.10` scores) |
 | **Capability Score** | — | **75.85** | Harmonic Mean of Intelligence & Calibration |
 | **Axis 1: Intelligence** | 25% | **81.38** | Choice: 85.07 \| Noul: 84.07 \| Score: 75.00 |
 | **Axis 2: Calibration** | 25% | **71.02** | ECE: 0.1549 \| Brier: 0.1596 |
 | **Axis 3: Speed** | 25% | **89.01** | p50: 148.5 ms \| p95: 845.0 ms |
 | **Axis 4: Cost** | 25% | **59.41** | $0.02253 per 1,000 decisions |
 
-*Public Tiers: Easy 100.0% (48/48), Standard 97.2% (70/72), Hard 56.8% (63/111).*
+*Earlier 4-axis baseline snapshot (`181/231` = `78.4%`: Easy `100.0%` [48/48], Standard `97.2%` [70/72], Hard `56.8%` [63/111]) prior to the promoted `68FCDB31...` release in the main scorecard above (`79.7%` [`184/231`], Hard `59.5%` [`66/111`]).*
 
 ### 2. Decision Index Evaluation Suite (`multimodalart/jev-decision-index`)
 
@@ -265,4 +265,4 @@ python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9
 
 - **Source Code & Python SDK (`src/`, `scripts/`):** Released under the **[Apache License 2.0](LICENSE)** (permissive commercial and open-source use).
 - **Training Curriculum Dataset ([`devops-thiago/classone-system-one-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)):** Released under **[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)** (NonCommercial ShareAlike) because it incorporates upstream non-commercial academic and safety benchmark subsets. Review upstream dataset licenses before commercial retraining.
-- **Base Models:** **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms); **Qwen 3.5** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen2.5).
+- **Base Models:** **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms); **Qwen 3.5** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen3.5).
