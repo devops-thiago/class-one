@@ -28,6 +28,17 @@ MAX_QUESTIONS_PER_REQUEST = 128
 MAX_TOKENS_PER_REQUEST = 8192
 
 
+def get_max_tokens_per_request() -> int:
+    """Resolve the per-request prompt token limit dynamically."""
+    raw = os.environ.get("CLASSONE_MAX_TOKENS_PER_REQUEST")
+    if raw is None or not raw.strip():
+        return MAX_TOKENS_PER_REQUEST
+    limit = int(raw)
+    if limit <= 0:
+        raise ValueError("CLASSONE_MAX_TOKENS_PER_REQUEST must be a positive integer.")
+    return limit
+
+
 def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
     """Lazily and thread-safely initializes or retrieves model and tokenizer pipeline."""
     global _model, _tokenizer, _prompt_builder
@@ -144,10 +155,11 @@ def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
         packed = builder.pack(state=request.state, questions=request.questions)
 
         input_token_count = int(packed.input_ids.shape[1])
-        if input_token_count > MAX_TOKENS_PER_REQUEST:
+        max_tokens = get_max_tokens_per_request()
+        if input_token_count > max_tokens:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Prompt length ({input_token_count} tokens) exceeds maximum limit ({MAX_TOKENS_PER_REQUEST}).",
+                detail=f"Prompt length ({input_token_count} tokens) exceeds maximum context length ({max_tokens}).",
             )
 
         answers = model.evaluate_packed(packed)
