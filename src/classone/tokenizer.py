@@ -8,6 +8,8 @@ for single-pass parallel pooling.
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -102,8 +104,10 @@ class ClassOnePromptBuilder:
     def pack(
         self,
         state: str | dict[str, Any] | list[Any],
-        questions: dict[str, Question],
+        questions: Mapping[str, Question],
         num_pause_tokens: int | None = None,
+        options_in_prefix: bool | str = False,
+        preamble_questions: Mapping[str, Question] | None = None,
     ) -> PackedSequence:
         """Packs state and questions into a single sequence with exact token positions.
 
@@ -141,10 +145,11 @@ class ClassOnePromptBuilder:
         text_parts: list[str] = []
         current_ids: list[int] = []
 
-        if len(prefix_ids) > 600 and questions:
+        target_preamble_qs = preamble_questions if preamble_questions is not None else questions
+        if len(prefix_ids) > 600 and target_preamble_qs:
             instructions_summary = "\n".join(
                 f"- [{qid}]: {self._serialize_text_field(getattr(q, 'instructions', None)).strip()}"
-                for qid, q in questions.items()
+                for qid, q in target_preamble_qs.items()
             )
             preamble_text = f"{d_state_start}\nTarget Objectives:\n{instructions_summary}\n{d_state_end}\n"
             preamble_ids = self.tokenizer.encode(preamble_text, add_special_tokens=True, return_tensors=None)
@@ -189,18 +194,8 @@ class ClassOnePromptBuilder:
                 )
 
             elif isinstance(q, ChoiceQuestion):
-                # Choice preamble
-                choice_header = f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n"
-                header_ids = self.tokenizer.encode(choice_header, add_special_tokens=False, return_tensors=None)
-                current_ids.extend(header_ids)
-                text_parts.append(choice_header)
-
-                opt_keys: list[str] = []
-                opt_indices: list[int] = []
-                opt_spans: list[tuple[int, int]] = []
-
+                cleaned_options: list[tuple[str, str]] = []
                 for opt_key, opt_desc in q.criteria.items():
-                    opt_keys.append(opt_key)
                     if opt_desc is None:
                         clean_desc = ""
                     elif isinstance(opt_desc, str):
@@ -215,6 +210,29 @@ class ClassOnePromptBuilder:
                             clean_desc = "No — negative, the condition does not hold."
                         else:
                             clean_desc = str(opt_key)
+                    cleaned_options.append((opt_key, clean_desc))
+
+                # Choice preamble: list candidate options in prefix only when options_in_prefix is enabled
+                # and the options are substantive (never for repeated boilerplate yes/no or true/false options)
+                use_opts_in_prefix = bool(options_in_prefix) and has_substantive_options(cleaned_options)
+                if use_opts_in_prefix and cleaned_options:
+                    options_listing = "\n".join(f"- {k}: {d}" for k, d in cleaned_options)
+                    choice_header = (
+                        f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n"
+                        f"Candidate Options:\n{options_listing}\n"
+                    )
+                else:
+                    choice_header = f"{d_choice_start}\nQuestion ID: {q_id}\nInstruction: {inst_text}\n"
+                header_ids = self.tokenizer.encode(choice_header, add_special_tokens=False, return_tensors=None)
+                current_ids.extend(header_ids)
+                text_parts.append(choice_header)
+
+                opt_keys: list[str] = []
+                opt_indices: list[int] = []
+                opt_spans: list[tuple[int, int]] = []
+
+                for opt_key, clean_desc in cleaned_options:
+                    opt_keys.append(opt_key)
                     opt_text = f"{d_opt_start}\nKey: {opt_key}\nCriteria: {clean_desc}\n{d_opt_end}\n"
                     opt_ids = self.tokenizer.encode(opt_text, add_special_tokens=False, return_tensors=None)
                     start_offset = len(current_ids)
@@ -306,3 +324,146 @@ class ClassOnePromptBuilder:
             attention_mask=attention_mask_tensor,
             questions=question_spans_meta,
         )
+
+
+_SEQUENTIAL_DEPENDENCY_MARKERS: tuple[str, ...] = (
+    "previous question",
+    "prior question",
+    "previous step",
+    "prior step",
+    "above decision",
+    "earlier question",
+)
+
+_TOOL_INVOCATION_PREFIXES: tuple[str, ...] = (
+    "tool_",
+    "func_",
+    "call_",
+    "action_",
+)
+
+_TOOL_INVOCATION_MARKERS: tuple[str, ...] = (
+    "invoke this tool",
+    "do not invoke this tool",
+    "call this function",
+    "do not call this function",
+    "func_description",
+    "tool_call",
+)
+
+_GENERIC_BOOLEAN_KEYS: frozenset[str] = frozenset({"yes", "no", "true", "false", "0", "1"})
+
+_BOILERPLATE_BOOLEAN_DESCRIPTIONS: frozenset[str] = frozenset(
+    {
+        "yes",
+        "no",
+        "true",
+        "false",
+        "yes — affirmative, the condition holds.",
+        "no — negative, the condition does not hold.",
+        "invoke this tool.",
+        "do not invoke this tool.",
+        "call this function.",
+        "do not call this function.",
+    }
+)
+
+
+def has_substantive_options(cleaned_options: list[tuple[str, str]], max_prefix_options: int = 20) -> bool:
+    """Returns True if options represent substantive candidate choices rather than boilerplate booleans.
+
+    Substantive options have letter/semantic labels or non-boilerplate descriptions, and moderate
+    cardinality (<= max_prefix_options so large-K catalogs are not duplicated in the prefix).
+    Boilerplate binary options (yes/no, true/false, 0/1 with generic boolean or tool-gate descriptions)
+    return False so they are never repeated as Candidate Options headers.
+    """
+    if not cleaned_options or len(cleaned_options) > max_prefix_options:
+        return False
+    keys_low = {str(k).strip().lower() for k, _ in cleaned_options}
+    if keys_low <= _GENERIC_BOOLEAN_KEYS:
+        descs_low = {str(d).strip().lower() for _, d in cleaned_options}
+        if descs_low <= _BOILERPLATE_BOOLEAN_DESCRIPTIONS or len(cleaned_options) == 2:
+            return False
+    return True
+
+
+def are_questions_independent(state: Any, questions: Mapping[str, Question]) -> bool:
+    """Determines from request structure whether multi-question evaluation can branch per question.
+
+    In ClassOne's API (`DecisionRequest(state, questions)`), questions $q_1, \\dots, q_N$ are
+    conditionally independent given `state` if `state` holds the complete world context and each
+    question queries `state` independently without depending on sibling questions.
+
+    Conditional independence fails (returning `False`, keeping all questions in a single packed pass)
+    in three structural cases:
+    1. Single-question requests (`len(questions) <= 1`): no branching needed.
+    2. Explicit cross-question or sequential chain references: a question's instructions or criteria
+       reference another question ID in `questions` or contain sequential chain markers.
+    3. Coupled candidate-pool or tool-invocation routing:
+       (a) Question IDs or instructions/criteria represent callable tool/function invocations
+           (e.g., `tool_*` / `func_*` prefixes or tool-invocation criteria), where deciding whether
+           to invoke tool $T_i$ requires seeing competing tools $T_{j \\neq i}$ in the request; OR
+       (b) All questions are binary gates (`NoulQuestion` or 2-option `ChoiceQuestion`) and either:
+           - All questions use generic boolean keys (`yes`/`no`, `true`/`false`, `0`/`1`) representing
+             a multi-label decomposition of a candidate pool;
+           - Any question's `instructions` is a structured candidate object (`dict`/`list`); or
+           - The aggregate serialized length of all question instructions exceeds the serialized `state`
+             length (`sum(len(inst_i)) > len(state_str)`), indicating that the candidate pool or
+             correlated signal set lives in `questions` rather than `state`.
+    """
+    if len(questions) <= 1:
+        return False
+
+    state_str = state.strip() if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
+    q_ids = list(questions.keys())
+    id_patterns = [
+        (qid, re.compile(rf"(?<![A-Za-z0-9_]){re.escape(qid)}(?![A-Za-z0-9_])"))
+        for qid in q_ids
+        if len(qid) >= 3
+    ]
+
+    all_binary = True
+    all_generic_boolean = True
+    has_structured_candidate_inst = False
+    total_inst_chars = 0
+
+    for q_id, q in questions.items():
+        q_id_low = str(q_id).strip().lower()
+        if q_id_low.startswith(_TOOL_INVOCATION_PREFIXES):
+            return False
+
+        raw_inst = getattr(q, "instructions", None)
+        if isinstance(raw_inst, (dict, list)):
+            has_structured_candidate_inst = True
+        inst_text = ClassOnePromptBuilder._serialize_text_field(raw_inst)
+        crit_text = ClassOnePromptBuilder._serialize_text_field(getattr(q, "criteria", None))
+        combined_text = f"{inst_text}\n{crit_text}"
+        combined_low = combined_text.lower()
+
+        total_inst_chars += len(inst_text)
+
+        if any(marker in combined_low for marker in _SEQUENTIAL_DEPENDENCY_MARKERS):
+            return False
+        if any(marker in combined_low for marker in _TOOL_INVOCATION_MARKERS):
+            return False
+
+        for other_id, pat in id_patterns:
+            if other_id != q_id and pat.search(combined_text):
+                return False
+
+        if isinstance(q, NoulQuestion):
+            pass
+        elif isinstance(q, ChoiceQuestion) and len(q.criteria) == 2:
+            keys_low = {str(k).strip().lower() for k in q.criteria}
+            if not (keys_low <= _GENERIC_BOOLEAN_KEYS):
+                all_generic_boolean = False
+        else:
+            all_binary = False
+            all_generic_boolean = False
+
+    if all_binary:
+        if all_generic_boolean or has_structured_candidate_inst or total_inst_chars > len(state_str):
+            return False
+
+    return True
+

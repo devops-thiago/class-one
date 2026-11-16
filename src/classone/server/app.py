@@ -214,17 +214,37 @@ def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
 
     try:
         model, builder = get_pipeline()
-        packed = builder.pack(state=request.state, questions=request.questions)
-
-        input_token_count = int(packed.input_ids.shape[1])
         max_tokens = get_max_tokens_per_request(model)
-        if max_tokens is not None and input_token_count > max_tokens:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Prompt length ({input_token_count} tokens) exceeds maximum context length ({max_tokens}).",
-            )
+        eval_mode = os.getenv("CLASSONE_EVAL_MODE", "stage1").strip().lower()
 
-        answers = model.evaluate_packed(packed)
+        if eval_mode == "legacy_packed":
+            packed = builder.pack(state=request.state, questions=request.questions, options_in_prefix=False)
+            input_token_count = int(packed.input_ids.shape[1])
+            if max_tokens is not None and input_token_count > max_tokens:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Prompt length ({input_token_count} tokens) exceeds maximum context length ({max_tokens}).",
+                )
+            answers = model.evaluate_packed(packed, position_invariant=False)
+        elif hasattr(model, "evaluate_request"):
+            answers, input_token_count = model.evaluate_request(
+                builder=builder,
+                state=request.state,
+                questions=request.questions,
+                options_in_prefix=True,
+                position_invariant=True,
+                adaptive_branching=(eval_mode != "c2_packed_only"),
+                max_tokens=max_tokens,
+            )
+        else:
+            packed = builder.pack(state=request.state, questions=request.questions)
+            input_token_count = int(packed.input_ids.shape[1])
+            if max_tokens is not None and input_token_count > max_tokens:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Prompt length ({input_token_count} tokens) exceeds maximum context length ({max_tokens}).",
+                )
+            answers = model.evaluate_packed(packed)
 
         return DecisionResponse(
             model=request.model,
