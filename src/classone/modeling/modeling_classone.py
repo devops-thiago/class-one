@@ -347,12 +347,15 @@ class ClassOneModel(PreTrainedModel):
                 else:
                     backbone = torch.ao.quantization.quantize_dynamic(backbone, {torch.nn.Linear}, dtype=torch.qint8)
 
-        # Resize token embeddings if tokenizer includes ClassOne delimiter tokens
+        # Resize token embeddings only when tokenizer exceeds existing embedding rows
         if tokenizer is not None and hasattr(backbone, "resize_token_embeddings"):
-            try:
-                backbone.resize_token_embeddings(len(tokenizer), mean_resizing=False)
-            except TypeError:
-                backbone.resize_token_embeddings(len(tokenizer))
+            cur_embed = backbone.get_input_embeddings() if hasattr(backbone, "get_input_embeddings") else None
+            cur_vocab = cur_embed.weight.shape[0] if cur_embed is not None and hasattr(cur_embed, "weight") else 0
+            if cur_vocab == 0 or len(tokenizer) > cur_vocab:
+                try:
+                    backbone.resize_token_embeddings(len(tokenizer), mean_resizing=False)
+                except TypeError:
+                    backbone.resize_token_embeddings(len(tokenizer))
 
         text_config = getattr(backbone.config, "text_config", None)
         hidden_size = (

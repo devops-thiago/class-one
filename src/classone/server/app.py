@@ -5,8 +5,11 @@ Exposes the POST /v1/decide and POST /v1/classone endpoints.
 
 from __future__ import annotations
 
+import copy
+import json
 import logging
 import os
+import pathlib
 import threading
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
@@ -18,6 +21,7 @@ from transformers import AutoTokenizer
 from classone.modeling.configuration_classone import ClassOneConfig
 from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import DecisionRequest, DecisionResponse, DecisionUsage
+from classone.stage2_readout import ChatDecisionPromptBuilder, evaluate_stage2_request, load_stage2_snapshot
 from classone.tokenizer import ClassOnePromptBuilder
 
 logger = logging.getLogger(__name__)
@@ -27,6 +31,7 @@ _pipeline_lock = threading.Lock()
 _model: ClassOneModel | None = None
 _tokenizer: Any | None = None
 _prompt_builder: ClassOnePromptBuilder | None = None
+_chat_builder: Any | None = None
 _warned_uncapped = False
 
 MAX_QUESTIONS_PER_REQUEST = 128
@@ -103,12 +108,13 @@ def get_max_tokens_per_request(model: Any | None = None) -> int | None:
 
 def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
     """Lazily and thread-safely initializes or retrieves model and tokenizer pipeline."""
-    global _model, _tokenizer, _prompt_builder
+    global _model, _tokenizer, _prompt_builder, _chat_builder
     if _model is None:
         with _pipeline_lock:
             if _model is None:
                 model_name = os.environ.get("CLASSONE_BASE_MODEL") or "standalone"
-                if model_name == "standalone":
+                snapshot_path = os.environ.get("CLASSONE_SNAPSHOT_PATH")
+                if model_name == "standalone" and not snapshot_path:
                     # Lightweight in-memory standalone mode
                     from tokenizers import Tokenizer
                     from tokenizers.models import WordLevel
@@ -121,6 +127,23 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                     _tokenizer = PreTrainedTokenizerFast(tokenizer_object=tok, unk_token="[UNK]", pad_token="[PAD]")
                     config = ClassOneConfig(hidden_size=256, head_hidden_size=128)
                     _model = ClassOneModel(config)
+                    _prompt_builder = ClassOnePromptBuilder(_tokenizer)
+                elif snapshot_path:
+                    if model_name == "standalone":
+                        meta_file = pathlib.Path(snapshot_path) / "snapshot_metadata.json"
+                        if meta_file.exists():
+                            model_name = json.loads(meta_file.read_text(encoding="utf-8")).get("base_model", model_name)
+                    import torch
+
+                    quant = os.environ.get("CLASSONE_QUANTIZATION")
+                    device = os.environ.get("CLASSONE_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
+                    _model, _tokenizer, _chat_builder = load_stage2_snapshot(
+                        model_name,
+                        snapshot_path,
+                        device=device,
+                        quantization=quant,
+                    )
+                    _prompt_builder = ClassOnePromptBuilder(copy.deepcopy(_tokenizer))
                 else:
                     import torch
 
@@ -134,17 +157,39 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                     tok_path = os.environ.get("CLASSONE_TOKENIZER_PATH") or (
                         os.path.dirname(q8_pt_path) if q8_pt_path and not os.path.isdir(model_name) else model_name
                     )
-                    _tokenizer = AutoTokenizer.from_pretrained(tok_path)
+                    eval_mode_env = os.getenv("CLASSONE_EVAL_MODE", "").strip().lower()
+                    disk_cfg: dict[str, Any] = {}
+                    if os.path.isdir(model_name):
+                        cfg_file = pathlib.Path(model_name) / "config.json"
+                        if cfg_file.exists():
+                            disk_cfg = json.loads(cfg_file.read_text(encoding="utf-8")).get("classone_config", {}) or {}
+                    is_stage2_cfg = eval_mode_env == "stage2" or disk_cfg.get("eval_mode") == "stage2"
+
+                    local_only = os.path.isdir(tok_path) or os.environ.get("HF_HUB_OFFLINE") == "1"
+                    _tokenizer = AutoTokenizer.from_pretrained(
+                        tok_path,
+                        trust_remote_code=True,
+                        local_files_only=local_only,
+                    )
+                    if is_stage2_cfg:
+                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
+                    elif getattr(_tokenizer, "chat_template", None):
+                        try:
+                            _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
+                        except Exception:
+                            _chat_builder = None
 
                     if q8_pt_path and os.path.exists(q8_pt_path) and device == "cpu":
                         print(f"Loading pre-quantized Q8 INT8 model with mmap=True from {q8_pt_path}...")
                         _model = torch.load(q8_pt_path, map_location="cpu", weights_only=False, mmap=True)
                     else:
+                        backbone_dtype = torch.bfloat16 if (is_stage2_cfg and device != "cpu" and not quant) else None
                         _model = ClassOneModel.from_backbone(
                             model_name,
                             tokenizer=_tokenizer,
                             device=device,
                             quantization=quant,
+                            torch_dtype=backbone_dtype,
                         )
                     # Load trained decision heads if available
                     heads_path = os.environ.get("CLASSONE_HEADS_PATH")
@@ -158,26 +203,39 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                         except Exception:
                             heads_path = None
                     if heads_path and os.path.exists(heads_path):
-                        heads = torch.load(heads_path, map_location=_model.device)
-                        _model.noul_head.load_state_dict(heads["noul_head"])
-                        _model.choice_head.load_state_dict(heads["choice_head"])
-                        _model.score_head.load_state_dict(heads["score_head"])
+                        heads = torch.load(heads_path, map_location=_model.device, weights_only=True)
+                        _model.noul_head.load_state_dict(heads["noul_head"], strict=False)
+                        _model.choice_head.load_state_dict(heads["choice_head"], strict=False)
+                        _model.score_head.load_state_dict(heads["score_head"], strict=False)
                         if str(_model.device) == "cpu":
                             _model.noul_head.to(dtype=torch.float32)
                             _model.choice_head.to(dtype=torch.float32)
                             _model.score_head.to(dtype=torch.float32)
 
-                _prompt_builder = ClassOnePromptBuilder(_tokenizer)
+                    backbone_cfg = getattr(getattr(_model, "backbone", None), "config", None)
+                    stage2_active = is_stage2_cfg or (
+                        (getattr(backbone_cfg, "classone_config", None) or {}).get("eval_mode") == "stage2"
+                    )
+                    if stage2_active and _chat_builder is None:
+                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
+                    if stage2_active and hasattr(getattr(_model, "backbone", None), "visual"):
+                        del _model.backbone.visual
+                        _model.backbone.visual = None
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+
+                    _prompt_builder = ClassOnePromptBuilder(_tokenizer)
 
     return _model, _prompt_builder
 
 
-def set_pipeline(model: ClassOneModel, prompt_builder: ClassOnePromptBuilder):
+def set_pipeline(model: ClassOneModel, prompt_builder: ClassOnePromptBuilder, chat_builder: Any | None = None):
     """Allows programmatic injection of model and tokenizer (e.g., during tests)."""
-    global _model, _prompt_builder
+    global _model, _prompt_builder, _chat_builder
     with _pipeline_lock:
         _model = model
         _prompt_builder = prompt_builder
+        _chat_builder = chat_builder
 
 
 @asynccontextmanager
@@ -216,8 +274,32 @@ def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
         model, builder = get_pipeline()
         max_tokens = get_max_tokens_per_request(model)
         eval_mode = os.getenv("CLASSONE_EVAL_MODE", "stage1").strip().lower()
+        cls_cfg = getattr(getattr(model, "backbone", None), "config", None)
+        stage2_cfg = getattr(cls_cfg, "classone_config", None) or {}
+        use_stage2 = _chat_builder is not None and (
+            eval_mode == "stage2"
+            or (
+                eval_mode not in ("legacy_packed", "c2_packed_only")
+                and (
+                    bool(os.environ.get("CLASSONE_SNAPSHOT_PATH", "").strip())
+                    or stage2_cfg.get("eval_mode") == "stage2"
+                )
+            )
+        )
 
-        if eval_mode == "legacy_packed":
+        if use_stage2:
+            m2_k_threshold = int(os.getenv("CLASSONE_M2_K_THRESHOLD", str(stage2_cfg.get("m2_k_threshold", 64))))
+            m2_top_k = int(os.getenv("CLASSONE_M2_TOP_K", str(stage2_cfg.get("m2_top_k", 16))))
+            answers, input_token_count = evaluate_stage2_request(
+                model,
+                _chat_builder,
+                state=request.state,
+                questions=request.questions,
+                m2_k_threshold=m2_k_threshold,
+                m2_top_k=m2_top_k,
+                max_tokens=max_tokens or 4096,
+            )
+        elif eval_mode == "legacy_packed":
             packed = builder.pack(state=request.state, questions=request.questions, options_in_prefix=False)
             input_token_count = int(packed.input_ids.shape[1])
             if max_tokens is not None and input_token_count > max_tokens:
