@@ -154,23 +154,45 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                     if not q8_pt_path and os.path.isfile(model_name) and model_name.endswith(".pt"):
                         q8_pt_path = model_name
 
+                    revision = os.environ.get("CLASSONE_REVISION", "").strip() or None
                     tok_path = os.environ.get("CLASSONE_TOKENIZER_PATH") or (
                         os.path.dirname(q8_pt_path) if q8_pt_path and not os.path.isdir(model_name) else model_name
                     )
                     eval_mode_env = os.getenv("CLASSONE_EVAL_MODE", "").strip().lower()
+                    offline_only = os.environ.get("HF_HUB_OFFLINE") == "1"
                     disk_cfg: dict[str, Any] = {}
                     if os.path.isdir(model_name):
                         cfg_file = pathlib.Path(model_name) / "config.json"
                         if cfg_file.exists():
                             disk_cfg = json.loads(cfg_file.read_text(encoding="utf-8")).get("classone_config", {}) or {}
+                    elif "/" in model_name and not q8_pt_path:
+                        try:
+                            from huggingface_hub import hf_hub_download
+
+                            cfg_file_hub = hf_hub_download(
+                                model_name,
+                                "config.json",
+                                revision=revision,
+                                local_files_only=offline_only,
+                            )
+                            disk_cfg = (
+                                json.loads(pathlib.Path(cfg_file_hub).read_text(encoding="utf-8")).get(
+                                    "classone_config", {}
+                                )
+                                or {}
+                            )
+                        except Exception:
+                            disk_cfg = {}
                     is_stage2_cfg = eval_mode_env == "stage2" or disk_cfg.get("eval_mode") == "stage2"
 
-                    local_only = os.path.isdir(tok_path) or os.environ.get("HF_HUB_OFFLINE") == "1"
-                    _tokenizer = AutoTokenizer.from_pretrained(
-                        tok_path,
-                        trust_remote_code=True,
-                        local_files_only=local_only,
-                    )
+                    local_only = os.path.isdir(tok_path) or offline_only
+                    tok_kwargs: dict[str, Any] = {
+                        "trust_remote_code": True,
+                        "local_files_only": local_only,
+                    }
+                    if revision and not os.path.isdir(tok_path):
+                        tok_kwargs["revision"] = revision
+                    _tokenizer = AutoTokenizer.from_pretrained(tok_path, **tok_kwargs)
                     if is_stage2_cfg:
                         _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
                     elif getattr(_tokenizer, "chat_template", None):
@@ -184,12 +206,16 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                         _model = torch.load(q8_pt_path, map_location="cpu", weights_only=False, mmap=True)
                     else:
                         backbone_dtype = torch.bfloat16 if (is_stage2_cfg and device != "cpu" and not quant) else None
+                        bb_kwargs: dict[str, Any] = {}
+                        if revision and not os.path.isdir(model_name):
+                            bb_kwargs["revision"] = revision
                         _model = ClassOneModel.from_backbone(
                             model_name,
                             tokenizer=_tokenizer,
                             device=device,
                             quantization=quant,
                             torch_dtype=backbone_dtype,
+                            **bb_kwargs,
                         )
                     # Load trained decision heads if available
                     heads_path = os.environ.get("CLASSONE_HEADS_PATH")
@@ -199,7 +225,12 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                         try:
                             from huggingface_hub import hf_hub_download
 
-                            heads_path = hf_hub_download(model_name, "classone_heads.pt")
+                            heads_path = hf_hub_download(
+                                model_name,
+                                "classone_heads.pt",
+                                revision=revision,
+                                local_files_only=offline_only,
+                            )
                         except Exception:
                             heads_path = None
                     if heads_path and os.path.exists(heads_path):
@@ -214,7 +245,12 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
 
                     backbone_cfg = getattr(getattr(_model, "backbone", None), "config", None)
                     stage2_active = is_stage2_cfg or (
-                        (getattr(backbone_cfg, "classone_config", None) or {}).get("eval_mode") == "stage2"
+                        (
+                            getattr(backbone_cfg, "classone_config", None)
+                            or getattr(getattr(_model, "config", None), "classone_config", None)
+                            or {}
+                        ).get("eval_mode")
+                        == "stage2"
                     )
                     if stage2_active and _chat_builder is None:
                         _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
@@ -275,7 +311,11 @@ def evaluate_decisions(request: DecisionRequest) -> DecisionResponse:
         max_tokens = get_max_tokens_per_request(model)
         eval_mode = os.getenv("CLASSONE_EVAL_MODE", "stage1").strip().lower()
         cls_cfg = getattr(getattr(model, "backbone", None), "config", None)
-        stage2_cfg = getattr(cls_cfg, "classone_config", None) or {}
+        stage2_cfg = (
+            getattr(cls_cfg, "classone_config", None)
+            or getattr(getattr(model, "config", None), "classone_config", None)
+            or {}
+        )
         use_stage2 = _chat_builder is not None and (
             eval_mode == "stage2"
             or (

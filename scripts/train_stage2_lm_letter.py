@@ -87,11 +87,7 @@ def load_heads_matching_shapes(model: ClassOneModel, heads_path: str, device: to
         if submod is None or not isinstance(src_dict, dict):
             continue
         dst_dict = submod.state_dict()
-        filtered = {
-            k: v
-            for k, v in src_dict.items()
-            if k in dst_dict and dst_dict[k].shape == v.shape
-        }
+        filtered = {k: v for k, v in src_dict.items() if k in dst_dict and dst_dict[k].shape == v.shape}
         submod.load_state_dict(filtered, strict=False)
         loaded_tensors += len(filtered)
     if rank == 0:
@@ -213,7 +209,9 @@ def _compute_unit_losses(
     item_hd_val = 0.0
     item_q_cnt = 0
 
-    tgt_map = tgts_or_single if isinstance(tgts_or_single, dict) else {next(iter(packed.questions.keys())): tgts_or_single}
+    tgt_map = (
+        tgts_or_single if isinstance(tgts_or_single, dict) else {next(iter(packed.questions.keys())): tgts_or_single}
+    )
 
     for qid, target in tgt_map.items():
         if qid not in packed.questions:
@@ -234,15 +232,15 @@ def _compute_unit_losses(
                 )
                 lm_idx = 0 if t_float >= 0.5 else 1
                 t_lm = torch.tensor([lm_idx], device=device, dtype=torch.long)
-                q_lm_loss = loss_fn_lm.forward_multiclass(
-                    probs_lm.unsqueeze(0), t_lm, logits=logits_lm.unsqueeze(0)
-                )
+                q_lm_loss = loss_fn_lm.forward_multiclass(probs_lm.unsqueeze(0), t_lm, logits=logits_lm.unsqueeze(0))
                 if ref_seq_hidden is not None:
                     with torch.no_grad():
                         p_ref, _ = compute_lm_letter_logits(
                             ref_seq_hidden[span.query_token_idx], embed_weight, explicit_label_ids, scale=lm_scale
                         )
-                    q_kl = F.kl_div(F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean")
+                    q_kl = F.kl_div(
+                        F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean"
+                    )
                     q_lm_loss = q_lm_loss + kl_weight * q_kl
                 item_loss = item_loss + (1.0 * q_lm_loss + 1.0 * q_hd_loss)
                 item_lm_val += float(q_lm_loss.item())
@@ -260,9 +258,7 @@ def _compute_unit_losses(
 
             h_opts = torch.stack([seq_hidden_fp32[idx] for idx in span.option_token_indices])
             probs_ch, logits_ch = model.choice_head(h_q_fp32, h_opts, return_logits=True)
-            q_hd_loss = loss_fn_heads.forward_multiclass(
-                probs_ch.unsqueeze(0), t_tensor, logits=logits_ch.unsqueeze(0)
-            )
+            q_hd_loss = loss_fn_heads.forward_multiclass(probs_ch.unsqueeze(0), t_tensor, logits=logits_ch.unsqueeze(0))
 
             if explicit_label_ids is not None:
                 cand_tok_ids = explicit_label_ids
@@ -276,15 +272,15 @@ def _compute_unit_losses(
                         cand_tok_ids.append(ids_k[0] if ids_k else tok_map[ordered_letters[o_i % len(ordered_letters)]])
 
             probs_lm, logits_lm = compute_lm_letter_logits(h_q_bf16, embed_weight, cand_tok_ids, scale=lm_scale)
-            q_lm_loss = loss_fn_lm.forward_multiclass(
-                probs_lm.unsqueeze(0), t_tensor, logits=logits_lm.unsqueeze(0)
-            )
+            q_lm_loss = loss_fn_lm.forward_multiclass(probs_lm.unsqueeze(0), t_tensor, logits=logits_lm.unsqueeze(0))
             if ref_seq_hidden is not None:
                 with torch.no_grad():
                     p_ref, _ = compute_lm_letter_logits(
                         ref_seq_hidden[span.query_token_idx], embed_weight, cand_tok_ids, scale=lm_scale
                     )
-                q_kl = F.kl_div(F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean")
+                q_kl = F.kl_div(
+                    F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean"
+                )
                 q_lm_loss = q_lm_loss + kl_weight * q_kl
 
             item_loss = item_loss + (1.0 * q_lm_loss + aux_head_weight * q_hd_loss)
@@ -302,9 +298,7 @@ def _compute_unit_losses(
             else:
                 target_idx = 0
             t_tensor = torch.tensor([target_idx], device=device, dtype=torch.long)
-            q_hd_loss = loss_fn_heads.forward_multiclass(
-                probs_sc.unsqueeze(0), t_tensor, logits=logits_sc.unsqueeze(0)
-            )
+            q_hd_loss = loss_fn_heads.forward_multiclass(probs_sc.unsqueeze(0), t_tensor, logits=logits_sc.unsqueeze(0))
 
             if explicit_label_ids is not None:
                 probs_lm, logits_lm = compute_lm_letter_logits(
@@ -318,7 +312,9 @@ def _compute_unit_losses(
                         p_ref, _ = compute_lm_letter_logits(
                             ref_seq_hidden[span.query_token_idx], embed_weight, explicit_label_ids, scale=lm_scale
                         )
-                    q_kl = F.kl_div(F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean")
+                    q_kl = F.kl_div(
+                        F.log_softmax(logits_lm, dim=-1).unsqueeze(0), p_ref.unsqueeze(0), reduction="batchmean"
+                    )
                     q_lm_loss = q_lm_loss + kl_weight * q_kl
                 item_loss = item_loss + (1.0 * q_lm_loss + 1.0 * q_hd_loss)
                 item_lm_val += float(q_lm_loss.item())
@@ -364,9 +360,7 @@ def _eval_mcq5_and_oos(
                         state=chat_builder.serialize_state(r["state"])[:8000], q_id=qid, question=q_obj
                     )
                 with torch.no_grad():
-                    hs = model.extract_hidden_states(
-                        packed.input_ids.to(device), packed.attention_mask.to(device)
-                    )
+                    hs = model.extract_hidden_states(packed.input_ids.to(device), packed.attention_mask.to(device))
                     span = packed.questions[qid]
                     _, logits_lm = compute_lm_letter_logits(
                         hs[0][span.query_token_idx], embed_weight, packed.label_token_ids[qid], scale=lm_scale
@@ -466,7 +460,10 @@ def run_stage2_worker(
         trainer.optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
         trainer.scheduler = None
         if rank == 0:
-            print(f"[Stage2 Arm {args.arm} | Rank {rank}] Resumed trainable LoRA adapter from {args.resume_lora} at lr={args.lr}", flush=True)
+            print(
+                f"[Stage2 Arm {args.arm} | Rank {rank}] Resumed trainable LoRA adapter from {args.resume_lora} at lr={args.lr}",
+                flush=True,
+            )
     else:
         trainer.enable_lora(r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=0.05)
 
@@ -485,7 +482,10 @@ def run_stage2_worker(
                 for line in Path(args.eval_oos_path).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-        print(f"[Stage2 EvalMonitor] Loaded mcq5={len(mcq5_rows)} rows, oos320={len(oos_rows)} rows (eval every {args.eval_every} steps)", flush=True)
+        print(
+            f"[Stage2 EvalMonitor] Loaded mcq5={len(mcq5_rows)} rows, oos320={len(oos_rows)} rows (eval every {args.eval_every} steps)",
+            flush=True,
+        )
 
     all_lines = Path(args.dataset_path).read_text(encoding="utf-8").splitlines()
     raw_items = [json.loads(line) for line in all_lines if line.strip()]
@@ -587,7 +587,7 @@ def run_stage2_worker(
         if rank == 0 and (step_idx == 1 or step_idx % log_every == 0 or step_idx == total_steps):
             elapsed = time.perf_counter() - t_start
             print(
-                f"[Arm {args.arm} Step {step_idx:4d}/{total_steps}] {step_sec:.2f}s/step (avg {elapsed/step_idx:.2f}s) | "
+                f"[Arm {args.arm} Step {step_idx:4d}/{total_steps}] {step_sec:.2f}s/step (avg {elapsed / step_idx:.2f}s) | "
                 f"loss={step_total_loss:.4f} (lm={step_lm_loss:.4f}, head={step_head_loss:.4f}) | "
                 f"VRAM peak={max_alloc_gb:.2f}GB res={res_gb:.2f}GB | tok={rec['avg_seq_tokens']}",
                 flush=True,
@@ -627,9 +627,13 @@ def run_stage2_worker(
                     f"oos320={ev['oos_320_acc']:.2f}% {ev['oos_slices']} ({ev['eval_sec']:.1f}s)",
                     flush=True,
                 )
-                if (not args.no_early_stop) and step_idx >= 400 and (
-                    (oos_rows and ev["oos_320_acc"] < args.oos_baseline_acc - 1.5)
-                    or (best_mcq5 >= 72.0 and ev["mcq5_acc"] < best_mcq5 - 4.0)
+                if (
+                    (not args.no_early_stop)
+                    and step_idx >= 400
+                    and (
+                        (oos_rows and ev["oos_320_acc"] < args.oos_baseline_acc - 1.5)
+                        or (best_mcq5 >= 72.0 and ev["mcq5_acc"] < best_mcq5 - 4.0)
+                    )
                 ):
                     stop_now = True
                     print(
@@ -646,21 +650,27 @@ def run_stage2_worker(
 
     if args.output_dir:
         os.makedirs(args.output_dir, exist_ok=True)
-        Path(args.output_dir, f"telemetry_rank{rank}.json").write_text(json.dumps(step_logs, indent=2), encoding="utf-8")
+        Path(args.output_dir, f"telemetry_rank{rank}.json").write_text(
+            json.dumps(step_logs, indent=2), encoding="utf-8"
+        )
         if rank == 0:
             trainer.save_checkpoint(args.output_dir)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Stage 2 LM-Head Letter Readout + Auxiliary Head Trainer")
-    parser.add_argument("--arm", type=str, default="A", choices=["A", "B"], help="Training arm: A (raw chat r32) or B (classone r16)")
+    parser.add_argument(
+        "--arm", type=str, default="A", choices=["A", "B"], help="Training arm: A (raw chat r32) or B (classone r16)"
+    )
     parser.add_argument("--base-model", type=str, required=True, help="Base model path or HF repo ID")
     parser.add_argument("--pretrained-heads", type=str, default=None, help="Path to classone_heads.pt")
     parser.add_argument("--resume-lora", type=str, default=None, help="Optional LoRA adapter dir to resume training")
     parser.add_argument("--dataset-path", type=str, required=True, help="Path to 3-layer filtered JSONL corpus")
     parser.add_argument("--output-dir", type=str, required=True, help="Output directory for checkpoints & telemetry")
     parser.add_argument("--epochs", type=int, default=2, help="Number of epochs")
-    parser.add_argument("--max-steps", type=int, default=None, help="Optional cap on optimizer steps (e.g. 60-step pilot)")
+    parser.add_argument(
+        "--max-steps", type=int, default=None, help="Optional cap on optimizer steps (e.g. 60-step pilot)"
+    )
     parser.add_argument("--batch-size", type=int, default=2, help="Micro-batch size per GPU")
     parser.add_argument("--gradient-accumulation-steps", type=int, default=2, help="Gradient accumulation steps")
     parser.add_argument("--max-seq-len", type=int, default=1536, help="Max token length per training sequence")
@@ -671,13 +681,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lm-focal-gamma", type=float, default=1.5, help="Focal gamma for LM-head letter loss")
     parser.add_argument("--head-focal-gamma", type=float, default=2.0, help="Focal gamma for auxiliary decision heads")
     parser.add_argument("--aux-head-weight", type=float, default=0.25, help="Weight on auxiliary ChoiceHead loss")
-    parser.add_argument("--kl-weight", type=float, default=0.0, help="Anti-forgetting KL weight toward frozen base readout")
+    parser.add_argument(
+        "--kl-weight", type=float, default=0.0, help="Anti-forgetting KL weight toward frozen base readout"
+    )
     parser.add_argument("--gpus", type=int, default=2, help="Number of local GPUs")
     parser.add_argument("--eval-every", type=int, default=0, help="Evaluate mcq5 + oos320 every N steps on rank 0")
-    parser.add_argument("--no-early-stop", action="store_true", help="Log + checkpoint every eval-every steps without halting early")
+    parser.add_argument(
+        "--no-early-stop", action="store_true", help="Log + checkpoint every eval-every steps without halting early"
+    )
     parser.add_argument("--eval-heldout1k-path", type=str, default=None, help="Path to heldout-non-suite-1k.jsonl")
     parser.add_argument("--eval-oos-path", type=str, default=None, help="Path to heldout-out-of-source-300.jsonl")
-    parser.add_argument("--oos-baseline-acc", type=float, default=83.12, help="Arm A OOS-320 baseline for early stopping")
+    parser.add_argument(
+        "--oos-baseline-acc", type=float, default=83.12, help="Arm A OOS-320 baseline for early stopping"
+    )
     return parser.parse_args()
 
 
@@ -693,9 +709,26 @@ def summarize_telemetry(out_dir: str, arm: str, world_size: int) -> dict:
         buckets.append(
             {
                 "steps": f"{c0[0]['step']}-{c0[-1]['step']}",
-                "avg_total_loss": round(0.5 * (statistics.mean(x["total_loss"] for x in c0) + statistics.mean(x["total_loss"] for x in c1)), 4),
-                "avg_lm_loss": round(0.5 * (statistics.mean(x["lm_letter_loss"] for x in c0) + statistics.mean(x["lm_letter_loss"] for x in c1)), 4),
-                "avg_aux_loss": round(0.5 * (statistics.mean(x["aux_head_loss"] for x in c0) + statistics.mean(x["aux_head_loss"] for x in c1)), 4),
+                "avg_total_loss": round(
+                    0.5 * (statistics.mean(x["total_loss"] for x in c0) + statistics.mean(x["total_loss"] for x in c1)),
+                    4,
+                ),
+                "avg_lm_loss": round(
+                    0.5
+                    * (
+                        statistics.mean(x["lm_letter_loss"] for x in c0)
+                        + statistics.mean(x["lm_letter_loss"] for x in c1)
+                    ),
+                    4,
+                ),
+                "avg_aux_loss": round(
+                    0.5
+                    * (
+                        statistics.mean(x["aux_head_loss"] for x in c0)
+                        + statistics.mean(x["aux_head_loss"] for x in c1)
+                    ),
+                    4,
+                ),
                 "avg_step_sec": round(statistics.mean(x["step_sec"] for x in c0), 3),
             }
         )

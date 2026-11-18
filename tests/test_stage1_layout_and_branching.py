@@ -58,7 +58,10 @@ def test_pos_inv_no_prefix_is_default_and_substantive_options_in_prefix_skips_bo
         questions={"q1": q_substantive},
         options_in_prefix=True,
     )
-    assert "Candidate Options:\n- opt_a: Activate card\n- opt_b: Cancel transfer\n- opt_c: Check balance" in packed_substantive.text
+    assert (
+        "Candidate Options:\n- opt_a: Activate card\n- opt_b: Cancel transfer\n- opt_c: Check balance"
+        in packed_substantive.text
+    )
     assert packed_substantive.input_ids.shape[1] > packed_default.input_ids.shape[1]
 
     # 3. Boilerplate boolean yes/no options are NEVER repeated in Candidate Options even when options_in_prefix=True
@@ -187,8 +190,12 @@ def test_are_questions_independent_structural_rules() -> None:
 
     # 6. Coupled generic yes/no multi-label decomposition -> False
     q_multilabel = {
-        "option_0": ChoiceQuestion(instructions="Does the text include concept A?", criteria={"yes": "Yes", "no": "No"}),
-        "option_1": ChoiceQuestion(instructions="Does the text include concept B?", criteria={"yes": "Yes", "no": "No"}),
+        "option_0": ChoiceQuestion(
+            instructions="Does the text include concept A?", criteria={"yes": "Yes", "no": "No"}
+        ),
+        "option_1": ChoiceQuestion(
+            instructions="Does the text include concept B?", criteria={"yes": "Yes", "no": "No"}
+        ),
     }
     assert are_questions_independent(long_state, q_multilabel) is False
 

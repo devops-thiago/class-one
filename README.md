@@ -62,7 +62,7 @@ with ClassOneClient(base_url="http://127.0.0.1:8000") as client:
 | Repository ID | Base Model | Context | Calibrated Heads SHA256 (Verified on Hub) | Formats |
 | :--- | :--- | :---: | :--- | :--- |
 | [`devops-thiago/classone-qwen3.5-9b`](https://huggingface.co/devops-thiago/classone-qwen3.5-9b) | Qwen/Qwen3.5-9B | 256k | `68FCDB3106BD5026B7CAFF507293961C16BD6BA178F74E9CFBF6266317C2A141` | BF16 Standalone, 4-bit NF4 |
-| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 256k | `654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66` | BF16 Standalone, 4-bit NF4 |
+| [`devops-thiago/classone-qwen3.5-4b`](https://huggingface.co/devops-thiago/classone-qwen3.5-4b) | Qwen/Qwen3.5-4B | 256k | `147AFEBDF277CF66375B18590BFD1C305F09D3DD1354D7F83EC7A346754C1E02` | BF16 Standalone, 4-bit NF4 |
 | [`devops-thiago/classone-gemma4-e4b`](https://huggingface.co/devops-thiago/classone-gemma4-e4b) | google/gemma-4-E4B-it | 128k | `8F7157F4D67D21698F94A3DF69B8492F4CC592DAC65E91AC47A83FD2E083AFDC` | BF16 Standalone, 4-bit NF4 |
 | [`devops-thiago/classone-qwen3.5-2b`](https://huggingface.co/devops-thiago/classone-qwen3.5-2b) | Qwen/Qwen3.5-2B | 256k | `BD24D8639DB9054CD9E0869E8DD2CF432D0B9A63AC82C557186A95D371E255F6` | FP16/BF16 Standalone, 8-bit |
 | [`devops-thiago/classone-gemma4-e2b`](https://huggingface.co/devops-thiago/classone-gemma4-e2b) | google/gemma-4-e2b-it | 128k | `F6A6E42365158D99807B8995C800429A0BD2B12755EDC1DEC5823400D35F337D` | FP16/BF16 Standalone, 8-bit |

@@ -417,9 +417,7 @@ def are_questions_independent(state: Any, questions: Mapping[str, Question]) -> 
     state_str = state.strip() if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
     q_ids = list(questions.keys())
     id_patterns = [
-        (qid, re.compile(rf"(?<![A-Za-z0-9_]){re.escape(qid)}(?![A-Za-z0-9_])"))
-        for qid in q_ids
-        if len(qid) >= 3
+        (qid, re.compile(rf"(?<![A-Za-z0-9_]){re.escape(qid)}(?![A-Za-z0-9_])")) for qid in q_ids if len(qid) >= 3
     ]
 
     all_binary = True
@@ -466,4 +464,3 @@ def are_questions_independent(state: Any, questions: Mapping[str, Question]) -> 
             return False
 
     return True
-

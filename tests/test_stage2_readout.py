@@ -228,3 +228,77 @@ def test_evaluate_stage2_request_and_server_routing(monkeypatch) -> None:
         assert body["answers"]["q_noul"]["noul"] == answers["n_check"].noul
     finally:
         server_app.set_pipeline(orig_state[0], orig_state[1], chat_builder=orig_state[2])
+
+
+def test_sdk_exports_and_stage2_config_propagation() -> None:
+    import classone
+
+    assert classone.__version__ == "0.3.0"
+    for sym in (
+        "ChatDecisionPromptBuilder",
+        "ChatPackedQuestion",
+        "build_single_token_labels",
+        "compute_lm_letter_logits",
+        "evaluate_stage2_request",
+        "load_stage2_snapshot",
+    ):
+        assert getattr(classone, sym) is not None
+
+    default_cfg = ClassOneConfig()
+    assert default_cfg.eval_mode == "stage1"
+    assert default_cfg.m2_k_threshold == 64
+    assert default_cfg.m2_top_k == 16
+    assert default_cfg.classone_config is None
+
+    tok = _build_chat_test_tokenizer()
+    chat_builder = ChatDecisionPromptBuilder(tok, max_k=8)
+
+    class _DummyBackbone(torch.nn.Module):
+        def __init__(self, vocab_size: int = 32, hidden_size: int = 64):
+            super().__init__()
+            self.embed = torch.nn.Embedding(vocab_size, hidden_size)
+            self.config = type(
+                "_Cfg",
+                (),
+                {
+                    "hidden_size": hidden_size,
+                    "classone_config": {
+                        "eval_mode": "stage2",
+                        "m2_k_threshold": 4,
+                        "m2_top_k": 2,
+                    },
+                },
+            )()
+
+        def get_input_embeddings(self):
+            return self.embed
+
+        def forward(self, input_ids, attention_mask=None, **kwargs):
+            return (self.embed(input_ids),)
+
+    backbone = _DummyBackbone()
+    model = ClassOneModel.from_backbone(backbone, device="cpu")
+    assert model.config.eval_mode == "stage2"
+    assert model.config.m2_k_threshold == 4
+    assert model.config.m2_top_k == 2
+    assert model.config.classone_config == {
+        "eval_mode": "stage2",
+        "m2_k_threshold": 4,
+        "m2_top_k": 2,
+    }
+
+    answers, total_tokens = model.evaluate_request(
+        chat_builder,
+        state="state",
+        questions={
+            "c_m2": ChoiceQuestion(
+                instructions="Pick among 4",
+                criteria={"o1": "first", "o2": "second", "o3": "first", "o4": "second"},
+            ),
+            "n1": NoulQuestion(instructions="Check condition"),
+        },
+        max_tokens=512,
+    )
+    assert total_tokens > 0
+    assert answers["c_m2"].choice in {"o1", "o2", "o3", "o4"}
+    assert 0.0 <= answers["n1"].noul <= 1.0

@@ -371,16 +371,39 @@ class ClassOneModel(PreTrainedModel):
             max_position_embeddings = None
         if max_position_embeddings is not None and max_position_embeddings <= 0:
             max_position_embeddings = None
+        backbone_cls_cfg = getattr(backbone.config, "classone_config", None) or {}
+        if isinstance(backbone_cls_cfg, dict) and backbone_cls_cfg:
+            cls_eval_mode = str(backbone_cls_cfg.get("eval_mode", "stage1"))
+            cls_m2_k = int(backbone_cls_cfg.get("m2_k_threshold", 64))
+            cls_m2_top_k = int(backbone_cls_cfg.get("m2_top_k", 16))
+        else:
+            cls_eval_mode = "stage1"
+            cls_m2_k = 64
+            cls_m2_top_k = 16
+
         if config is None:
             config = ClassOneConfig(
                 base_model_name_or_path=model_name,
                 hidden_size=hidden_size,
                 max_position_embeddings=max_position_embeddings,
+                eval_mode=cls_eval_mode,
+                m2_k_threshold=cls_m2_k,
+                m2_top_k=cls_m2_top_k,
+                classone_config=dict(backbone_cls_cfg) if backbone_cls_cfg else None,
             )
         else:
             config.hidden_size = hidden_size
             if getattr(config, "max_position_embeddings", None) is None and max_position_embeddings is not None:
                 config.max_position_embeddings = max_position_embeddings
+            if backbone_cls_cfg:
+                if getattr(config, "classone_config", None) is None:
+                    config.classone_config = dict(backbone_cls_cfg)
+                if getattr(config, "eval_mode", "stage1") == "stage1" and "eval_mode" in backbone_cls_cfg:
+                    config.eval_mode = cls_eval_mode
+                if "m2_k_threshold" in backbone_cls_cfg:
+                    config.m2_k_threshold = cls_m2_k
+                if "m2_top_k" in backbone_cls_cfg:
+                    config.m2_top_k = cls_m2_top_k
 
         model = cls(config=config, backbone=backbone)
 
@@ -396,15 +419,19 @@ class ClassOneModel(PreTrainedModel):
             target_device = torch.device(device)
 
         is_quantized = getattr(backbone, "is_loaded_in_8bit", False) or getattr(backbone, "is_loaded_in_4bit", False)
+        effective_dtype = torch_dtype
+        if effective_dtype is None and not is_quantized and target_device.type != "cpu" and cls_eval_mode == "stage2":
+            effective_dtype = torch.bfloat16
+
         if is_quantized:
             head_dtype = torch_dtype or torch.float16
             model.noul_head.to(device=target_device, dtype=head_dtype)
             model.choice_head.to(device=target_device, dtype=head_dtype)
             model.score_head.to(device=target_device, dtype=head_dtype)
+        elif effective_dtype is not None:
+            model.to(device=target_device, dtype=effective_dtype)
         else:
             model.to(target_device)
-            if torch_dtype is not None:
-                model.to(dtype=torch_dtype)
 
         return model
 
@@ -680,9 +707,7 @@ class ClassOneModel(PreTrainedModel):
         prefix_ids = prefix_packed.input_ids.to(self.device)
         prefix_len = int(prefix_ids.shape[1])
         if max_tokens is not None and prefix_len > max_tokens:
-            raise ValueError(
-                f"Prompt length ({prefix_len} tokens) exceeds maximum context length ({max_tokens})."
-            )
+            raise ValueError(f"Prompt length ({prefix_len} tokens) exceeds maximum context length ({max_tokens}).")
 
         head_dtype = next(self.noul_head.parameters()).dtype
         mask_dtype = self._backbone_float_dtype()
@@ -739,9 +764,7 @@ class ClassOneModel(PreTrainedModel):
                 has_options = len(getattr(span, "option_token_spans", [])) > 1
 
                 if position_invariant and has_options and total_len <= max_2d_mask_tokens:
-                    mask_4d, pos_ids = self.build_position_invariant_mask(
-                        q_packed, self.device, dtype=mask_dtype
-                    )
+                    mask_4d, pos_ids = self.build_position_invariant_mask(q_packed, self.device, dtype=mask_dtype)
                     suffix_mask_4d = mask_4d[:, :, prefix_len:, :]
                     suffix_pos_ids = pos_ids[:, prefix_len:]
                     mask_arg = self._wrap_4d_attention_mask(suffix_mask_4d)
@@ -761,9 +784,7 @@ class ClassOneModel(PreTrainedModel):
                         use_cache=False,
                     )
 
-                seq_hidden = (
-                    q_out.last_hidden_state[0] if hasattr(q_out, "last_hidden_state") else q_out[0][0]
-                )
+                seq_hidden = q_out.last_hidden_state[0] if hasattr(q_out, "last_hidden_state") else q_out[0][0]
                 if seq_hidden.dtype != head_dtype:
                     seq_hidden = seq_hidden.to(head_dtype)
 
@@ -784,16 +805,40 @@ class ClassOneModel(PreTrainedModel):
         position_invariant: bool = True,
         adaptive_branching: bool = True,
         max_tokens: int | None = None,
+        eval_mode: str | None = None,
+        m2_k_threshold: int | None = None,
+        m2_top_k: int | None = None,
     ) -> tuple[dict[str, Result], int]:
-        """Evaluates a full DecisionRequest using Stage 1 defaults (pos_inv_only_no_prefix + adaptive branching).
+        """Evaluates a full DecisionRequest using configured Stage 2 or Stage 1 defaults.
 
-        - Defaults to options_in_prefix=False and 2D position_invariant=True option masking.
-        - When options_in_prefix=True, enables prefix listing only for substantive options
-          (never for boilerplate yes/no or true/false options).
-        - Uses per-question KV-cached branching over the shared state prefix when
-          `are_questions_independent(state, questions)` holds, and evaluates coupled/dependent
-          questions (e.g. BFCL tool-call chains) in a single packed pass.
+        - When `eval_mode == "stage2"` (or `self.config.eval_mode == "stage2"` /
+          `ChatDecisionPromptBuilder`), routes to `evaluate_stage2_request` with LM-head
+          letter readout and two-pass M2 shortlist routing (`m2_k_threshold`, `m2_top_k`).
+        - Otherwise evaluates Stage 1 defaults (pos_inv_only_no_prefix + adaptive branching).
         """
+        resolved_mode = (eval_mode or getattr(self.config, "eval_mode", "stage1")).strip().lower()
+        if resolved_mode == "stage2" or hasattr(builder, "pack_question"):
+            from classone.stage2_readout import ChatDecisionPromptBuilder, evaluate_stage2_request
+
+            chat_builder = builder if hasattr(builder, "pack_question") else None
+            if chat_builder is None and hasattr(builder, "tokenizer"):
+                chat_builder = ChatDecisionPromptBuilder(builder.tokenizer)
+            if chat_builder is None:
+                raise ValueError("Stage 2 evaluation requires a ChatDecisionPromptBuilder or tokenizer-backed builder.")
+            resolved_m2_k = int(
+                m2_k_threshold if m2_k_threshold is not None else getattr(self.config, "m2_k_threshold", 64)
+            )
+            resolved_m2_top_k = int(m2_top_k if m2_top_k is not None else getattr(self.config, "m2_top_k", 16))
+            return evaluate_stage2_request(
+                self,
+                chat_builder,
+                state=state,
+                questions=questions,
+                m2_k_threshold=resolved_m2_k,
+                m2_top_k=resolved_m2_top_k,
+                max_tokens=max_tokens or 4096,
+            )
+
         if adaptive_branching and are_questions_independent(state, questions):
             return self.evaluate_questions_branched(
                 builder=builder,
