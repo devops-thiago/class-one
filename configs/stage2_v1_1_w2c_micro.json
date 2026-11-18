@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "release_candidate": "v1_1_merge_0.40_0.60",
+  "base_model": "Qwen/Qwen3.5-4B",
+  "micro_stage_training": {
+    "script": "scripts/train_stage2_lm_letter.py",
+    "arm": "A",
+    "resume_from": "checkpoints/snapshots/stage2b_step400",
+    "epochs": 1,
+    "max_steps": 250,
+    "batch_size_per_gpu": 2,
+    "gradient_accumulation_steps": 2,
+    "gpus": 2,
+    "effective_batch_size": 8,
+    "learning_rate": 3e-5,
+    "lr_schedule": "cosine",
+    "kl_weight": 0.05,
+    "lora_r": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.05,
+    "lm_scale": 1.0,
+    "lm_focal_gamma": 1.5,
+    "head_focal_gamma": 2.0,
+    "aux_head_weight": 0.25,
+    "eval_every": 125
+  },
+  "corpus_composition": {
+    "builder": "scripts/build_w2c_micro_corpus.py",
+    "seed": 20261118,
+    "total_rows": 2000,
+    "when2call_4way_mcq_rows": 1000,
+    "when2call_gold_strategy_quotas": {
+      "cannot_answer_refusal": 322,
+      "ask_clarification": 322,
+      "tool_call_json": 320,
+      "direct_or_other": 36
+    },
+    "option_slot_layout": "50% canonical [direct, tool_call, ask_clarification, cannot_answer], 50% shuffled",
+    "replay_rows": 1000,
+    "replay_quotas": {
+      "ClassOne_JevBench_Replay": 250,
+      "openai/gsm8k": 100,
+      "cais/mmlu_aux": 100,
+      "tau/commonsense_qa": 100,
+      "allenai/openbookqa": 100,
+      "ucinlp/drop": 75,
+      "pminervini/HaluEval": 75,
+      "nyu-mll/multi_nli": 50,
+      "stanfordnlp/snli": 50,
+      "mteb/banking77 (train)": 25,
+      "clinc/clinc_oos (train)": 25,
+      "ContractNLI (tau/scrolls train)": 25,
+      "coastalcph/lex_glue_ledgar (train)": 25
+    }
+  },
+  "linear_merge_recipe": {
+    "method": "exact_linear_lora_delta_and_head_blend",
+    "components": [
+      {
+        "name": "stage2b_w2c_micro",
+        "weight": 0.4,
+        "step": 250
+      },
+      {
+        "name": "fresh_step200",
+        "weight": 0.6,
+        "step": 200,
+        "source_corpus_rows": 10457
+      }
+    ],
+    "inference_routing": {
+      "eval_mode": "stage2",
+      "m2_k_threshold": 64,
+      "m2_top_k": 16
+    }
+  }
+}
