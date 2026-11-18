@@ -180,7 +180,9 @@ def parse_toolcall_and_classify(resp_obj: dict | str) -> tuple[str, str]:
             if isinstance(parsed, list) and parsed:
                 parsed = parsed[0]
             if isinstance(parsed, dict) and "name" in parsed:
-                norm = json.dumps({"name": parsed["name"], "arguments": parsed.get("arguments", {})}, ensure_ascii=False)
+                norm = json.dumps(
+                    {"name": parsed["name"], "arguments": parsed.get("arguments", {})}, ensure_ascii=False
+                )
                 return "tool_call_json", norm
         except Exception:
             pass
@@ -329,7 +331,11 @@ def build_w2c_micro_corpus(
             for cat in CANONICAL_ORDER:
                 if cat in opts_by_cat:
                     continue
-                txt = synth_tool_call_for_prompt(state["tools"], rng) if cat == "tool_call_json" else _next_pool_text(cat, used_texts)
+                txt = (
+                    synth_tool_call_for_prompt(state["tools"], rng)
+                    if cat == "tool_call_json"
+                    else _next_pool_text(cat, used_texts)
+                )
                 opts_by_cat[cat] = txt
                 used_texts.add(txt)
 
@@ -400,7 +406,9 @@ def main() -> None:
     parser.add_argument("--stage2b-corpus", type=Path, default=None, help="Path to Stage 2b corpus JSONL for replay")
     parser.add_argument("--combined-corpus", type=Path, default=None, help="Path to Stage 2 combined corpus JSONL")
     parser.add_argument("--output-path", type=Path, required=True, help="Output JSONL path")
-    parser.add_argument("--eval-paths", type=Path, nargs="*", default=[], help="Evaluation JSONL/dir paths for 3-layer filtering")
+    parser.add_argument(
+        "--eval-paths", type=Path, nargs="*", default=[], help="Evaluation JSONL/dir paths for 3-layer filtering"
+    )
     parser.add_argument("--seed", type=int, default=20261118)
     parser.add_argument("--offline", action="store_true", help="Force HuggingFace datasets offline mode")
     args = parser.parse_args()

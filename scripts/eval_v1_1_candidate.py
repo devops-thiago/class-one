@@ -209,7 +209,14 @@ def eval_jevbench_and_alignbench(
     align_code = REPO_ROOT / "data" / "RLCDAlignBench" / "code"
     if str(align_code) not in sys.path:
         sys.path.insert(0, str(align_code))
-    batteries = ["battery_refusal", "battery_a_judge", "battery_bc_paired", "battery_d_rule", "battery_e", "battery_f_trajectory"]
+    batteries = [
+        "battery_refusal",
+        "battery_a_judge",
+        "battery_bc_paired",
+        "battery_d_rule",
+        "battery_e",
+        "battery_f_trajectory",
+    ]
     y_true, y_score = [], []
     for b_name in batteries:
         mod = importlib.import_module(b_name)
@@ -222,8 +229,16 @@ def eval_jevbench_and_alignbench(
             answers_dict = {qid: a.model_dump() for qid, a in answers.items()}
             try:
                 strat = mod.strategies(s, answers_dict)
-                dk = [k for k in strat if "direct" in k and not k.startswith("aux:") and "b_worse" not in k and "false_prohibit" not in k]
-                vals = [strat[k] for k in (dk or strat) if (not k.startswith(("aux:", "exclusion:", "extra:"))) and isinstance(strat[k], (int, float))]
+                dk = [
+                    k
+                    for k in strat
+                    if "direct" in k and not k.startswith("aux:") and "b_worse" not in k and "false_prohibit" not in k
+                ]
+                vals = [
+                    strat[k]
+                    for k in (dk or strat)
+                    if (not k.startswith(("aux:", "exclusion:", "extra:"))) and isinstance(strat[k], (int, float))
+                ]
                 risk = float(np.mean(vals)) if vals else 0.5
             except Exception:
                 nvs = [a["noul"] for a in answers_dict.values() if a.get("type") == "noul"]

@@ -22,7 +22,7 @@
     },
     "devops-thiago/classone-qwen3.5-4b": {
       "base_model": "Qwen/Qwen3.5-4B",
-      "heads_sha256": "654DA038EA5883916F3323F1A5BE64DEEFADB864B2EAE48DF9CD915D9C8A8F66",
+      "heads_sha256": "147AFEBDF277CF66375B18590BFD1C305F09D3DD1354D7F83EC7A346754C1E02",
       "floors": {
         "jevbench_public_acc": 0.758,
         "decision_index_score": 98.99,
