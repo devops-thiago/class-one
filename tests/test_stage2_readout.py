@@ -19,9 +19,11 @@ from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from classone.server import app as server_app
 from classone.stage2_readout import (
     ChatDecisionPromptBuilder,
+    CodebookLMHead,
     build_single_token_labels,
     compute_lm_letter_logits,
     evaluate_stage2_request,
+    load_codebook_lm_head,
 )
 from classone.tokenizer import ClassOnePromptBuilder
 
@@ -301,4 +303,127 @@ def test_sdk_exports_and_stage2_config_propagation() -> None:
     )
     assert total_tokens > 0
     assert answers["c_m2"].choice in {"o1", "o2", "o3", "o4"}
+    assert 0.0 <= answers["n1"].noul <= 1.0
+
+
+def test_codebook_lm_head_parity_and_gradients() -> None:
+    from safetensors.torch import save_file
+
+    tok = _build_chat_test_tokenizer()
+    chat_builder = ChatDecisionPromptBuilder(tok, max_k=8)
+    vocab_size, hidden_size = len(tok), 64
+    full_w = torch.randn(vocab_size, hidden_size, dtype=torch.bfloat16)
+
+    ids = [tid for _, tid in chat_builder.codebook] + [tid for tid in chat_builder.yes_no_ids if tid not in {t for _, t in chat_builder.codebook}]
+    slice_w = full_w.index_select(0, torch.tensor(ids, dtype=torch.long)).clone()
+    cb_head = CodebookLMHead(slice_w, ids)
+    assert sum(p.numel() for p in cb_head.parameters()) == 0  # frozen buffer only
+
+    h_q_ref = torch.randn(hidden_size, dtype=torch.bfloat16, requires_grad=True)
+    h_q_cb = h_q_ref.detach().clone().requires_grad_(True)
+    query_ids = [13, 14, 15, 11]
+    p_ref, z_ref = compute_lm_letter_logits(h_q_ref, full_w, query_ids, scale=1.0)
+    p_cb, z_cb = compute_lm_letter_logits(h_q_cb, cb_head, query_ids, scale=1.0)
+    assert float(torch.max(torch.abs(z_ref - z_cb)).item()) < 1e-6
+    assert float(torch.max(torch.abs(p_ref - p_cb)).item()) < 1e-6
+
+    (-torch.log(p_cb[0] + 1e-8)).backward()
+    assert h_q_cb.grad is not None and torch.isfinite(h_q_cb.grad).all()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_file({"lm_head.weight": full_w}, os.path.join(tmpdir, "model.safetensors"))
+        cfg_untied = {"tie_word_embeddings": False}
+        with open(os.path.join(tmpdir, "config.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg_untied, f)
+        loaded = load_codebook_lm_head(tmpdir, chat_builder, device="cpu", dtype=torch.bfloat16)
+        assert loaded is not None
+        _, z_loaded = compute_lm_letter_logits(h_q_cb.detach(), loaded, query_ids, scale=1.0)
+        assert float(torch.max(torch.abs(z_ref - z_loaded)).item()) < 1e-6
+
+        with open(os.path.join(tmpdir, "config.json"), "w", encoding="utf-8") as f:
+            json.dump({"tie_word_embeddings": True}, f)
+        assert load_codebook_lm_head(tmpdir, chat_builder, device="cpu") is None
+
+
+def test_model_parallel_device_routing_and_backward() -> None:
+    tok = _build_chat_test_tokenizer()
+    chat_builder = ChatDecisionPromptBuilder(tok, max_k=8)
+
+    class _DummyBlock(torch.nn.Module):
+        def __init__(self, hidden_size: int):
+            super().__init__()
+            self.proj = torch.nn.Linear(hidden_size, hidden_size)
+
+        def forward(self, x: torch.Tensor, **kwargs):
+            return x + 0.1 * torch.tanh(self.proj(x))
+
+    class _DummyLayeredBackbone(torch.nn.Module):
+        def __init__(self, vocab_size: int = 32, hidden_size: int = 64):
+            super().__init__()
+            self.embed_tokens = torch.nn.Embedding(vocab_size, hidden_size)
+            self.layers = torch.nn.ModuleList([_DummyBlock(hidden_size) for _ in range(4)])
+            self.norm = torch.nn.LayerNorm(hidden_size)
+            self.config = type("_Cfg", (), {"hidden_size": hidden_size})()
+
+        def get_input_embeddings(self):
+            return self.embed_tokens
+
+        def forward(self, input_ids, attention_mask=None, **kwargs):
+            h = self.embed_tokens(input_ids)
+            for layer in self.layers:
+                h = layer(h, attention_mask=attention_mask)
+            return (self.norm(h),)
+
+    # Default model_parallel=False behavior unchanged
+    single_model = ClassOneModel.from_backbone(_DummyLayeredBackbone(), device="cpu")
+    assert single_model.is_model_parallel is False
+    assert single_model.input_device == torch.device("cpu")
+    assert single_model.output_device == torch.device("cpu")
+
+    dev0 = "cuda:0" if torch.cuda.device_count() >= 2 else "cpu"
+    dev1 = "cuda:1" if torch.cuda.device_count() >= 2 else "cpu"
+
+    backbone = _DummyLayeredBackbone()
+    model = ClassOneModel.from_backbone(
+        backbone,
+        model_parallel=True,
+        mp_devices=(dev0, dev1),
+        mp_split_layer=2,
+        head_dtype=torch.float32,
+    )
+    assert model.is_model_parallel is True
+    assert model.input_device == torch.device(dev0)
+    assert model.output_device == torch.device(dev1)
+    assert next(model.backbone.layers[0].parameters()).device == torch.device(dev0)
+    assert next(model.backbone.layers[2].parameters()).device == torch.device(dev1)
+    assert next(model.noul_head.parameters()).device == torch.device(dev1)
+
+    model.train()
+    inp = torch.tensor([[21, 22, 23]], dtype=torch.long)
+    mask = torch.ones_like(inp)
+    hs = model.extract_hidden_states(inp, mask)
+    assert hs.device == torch.device(dev1)
+    prob, _ = model.noul_head(hs[0, -1], return_logits=True)
+    prob.backward()
+
+    g0 = model.backbone.layers[0].proj.weight.grad
+    g3 = model.backbone.layers[3].proj.weight.grad
+    assert g0 is not None and torch.isfinite(g0).all() and float(g0.abs().sum()) > 0
+    assert g3 is not None and torch.isfinite(g3).all() and float(g3.abs().sum()) > 0
+
+    model.lm_readout_head = CodebookLMHead(
+        torch.randn(len(chat_builder.codebook), 64, device=dev1, dtype=torch.float32),
+        [tid for _, tid in chat_builder.codebook],
+    )
+    answers, toks = model.evaluate_request(
+        chat_builder,
+        state="state",
+        questions={
+            "c1": ChoiceQuestion(instructions="Pick", criteria={"x1": "first", "x2": "second"}),
+            "n1": NoulQuestion(instructions="Check"),
+        },
+        max_tokens=128,
+    )
+    assert toks > 0
+    assert answers["c1"].choice in {"x1", "x2"}
     assert 0.0 <= answers["n1"].noul <= 1.0

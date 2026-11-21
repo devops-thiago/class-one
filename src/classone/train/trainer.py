@@ -53,7 +53,8 @@ class ClassOneTrainer:
         self.weight_decay = weight_decay
         self.device = torch.device(device) if device else self.model.device
         self.heads_only = heads_only
-        self.model.to(self.device)
+        if not getattr(self.model, "is_model_parallel", False):
+            self.model.to(self.device)
 
         if self.heads_only:
             for p in self.model.backbone.parameters():

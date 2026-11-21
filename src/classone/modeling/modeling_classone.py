@@ -216,6 +216,27 @@ class ScoreHead(nn.Module):
         return super().load_state_dict(state_dict, strict=strict, assign=assign)
 
 
+def _move_tensors_to_device(obj: Any, device: torch.device) -> Any:
+    """Recursively moves tensors inside nested tuples/lists/dicts onto target device."""
+    if torch.is_tensor(obj):
+        return obj if obj.device == device else obj.to(device)
+    if isinstance(obj, tuple):
+        return tuple(_move_tensors_to_device(x, device) for x in obj)
+    if isinstance(obj, list):
+        return [_move_tensors_to_device(x, device) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _move_tensors_to_device(v, device) for k, v in obj.items()}
+    return obj
+
+
+def _resolve_text_backbone(backbone: nn.Module) -> nn.Module:
+    """Unwraps PEFT/multimodal wrappers to locate the transformer stack containing layers."""
+    mod = backbone
+    if hasattr(mod, "base_model") and hasattr(mod.base_model, "model"):
+        mod = mod.base_model.model
+    return getattr(mod, "language_model", mod)
+
+
 class ClassOneModel(PreTrainedModel):
     """Complete ClassOne decision model wrapping a transformer backbone with System 1 heads."""
 
@@ -224,6 +245,11 @@ class ClassOneModel(PreTrainedModel):
     def __init__(self, config: ClassOneConfig, backbone: nn.Module | None = None):
         super().__init__(config)
         self.config = config
+        self._model_parallel: bool = False
+        self._input_device: torch.device | None = None
+        self._output_device: torch.device | None = None
+        self._mp_hook_handles: list[Any] = []
+        self.lm_readout_head: nn.Module | None = None
 
         if backbone is not None:
             self.backbone = backbone
@@ -255,8 +281,92 @@ class ClassOneModel(PreTrainedModel):
 
     @property
     def device(self) -> torch.device:
-        """Returns the device of the model parameters."""
+        """Returns the primary device of the model parameters (input device in model-parallel mode)."""
+        if getattr(self, "_model_parallel", False) and self._input_device is not None:
+            return self._input_device
         return next(self.parameters()).device
+
+    @property
+    def is_model_parallel(self) -> bool:
+        """Returns True when layers are sharded across multiple devices."""
+        return bool(getattr(self, "_model_parallel", False))
+
+    @property
+    def input_device(self) -> torch.device:
+        """Device expecting input_ids / attention_mask tensors."""
+        if getattr(self, "_model_parallel", False) and self._input_device is not None:
+            return self._input_device
+        return self.device
+
+    @property
+    def output_device(self) -> torch.device:
+        """Device hosting final hidden states, decision heads, and Stage 2 LM readout."""
+        if getattr(self, "_model_parallel", False) and self._output_device is not None:
+            return self._output_device
+        return self.device
+
+    def enable_model_parallel(
+        self,
+        devices: tuple[str | torch.device, str | torch.device] = ("cuda:0", "cuda:1"),
+        split_layer: int | None = None,
+        head_dtype: torch.dtype | None = torch.float32,
+    ) -> ClassOneModel:
+        """Shards transformer layers across two devices and keeps System 1 heads on the output device."""
+        for h in self._mp_hook_handles:
+            h.remove()
+        self._mp_hook_handles.clear()
+
+        if hasattr(self.backbone, "visual"):
+            del self.backbone.visual
+            self.backbone.visual = None
+
+        text_model = _resolve_text_backbone(self.backbone)
+        layers = getattr(text_model, "layers", None)
+        if layers is None or len(layers) < 2:
+            raise ValueError("Model parallel requires a backbone with at least 2 transformer layers.")
+
+        dev0 = torch.device(devices[0])
+        dev1 = torch.device(devices[1])
+        split_idx = split_layer if split_layer is not None else (len(layers) // 2)
+        if not (1 <= split_idx < len(layers)):
+            raise ValueError(f"split_layer={split_idx} must be in [1, {len(layers) - 1}]")
+
+        if hasattr(self, "embed"):
+            self.embed.to(dev0)
+
+        for name, child in text_model.named_children():
+            if name == "layers":
+                for i, layer in enumerate(child):
+                    layer.to(dev0 if i < split_idx else dev1)
+            elif name == "norm":
+                child.to(dev1)
+            else:
+                child.to(dev0)
+
+        def _make_move_hook(target_dev: torch.device):
+            def _hook(_mod, args, kwargs):
+                return _move_tensors_to_device(args, target_dev), _move_tensors_to_device(kwargs, target_dev)
+
+            return _hook
+
+        hook_fn = _make_move_hook(dev1)
+        for layer in layers[split_idx:]:
+            self._mp_hook_handles.append(layer.register_forward_pre_hook(hook_fn, with_kwargs=True))
+        if hasattr(text_model, "norm") and text_model.norm is not None:
+            self._mp_hook_handles.append(text_model.norm.register_forward_pre_hook(hook_fn, with_kwargs=True))
+
+        for head in (self.noul_head, self.choice_head, self.score_head):
+            if head_dtype is not None:
+                head.to(device=dev1, dtype=head_dtype)
+            else:
+                head.to(dev1)
+        if self.lm_readout_head is not None:
+            self.lm_readout_head.to(dev1)
+
+        self._model_parallel = True
+        self._input_device = dev0
+        self._output_device = dev1
+        return self
 
     @classmethod
     def from_backbone(
@@ -267,6 +377,10 @@ class ClassOneModel(PreTrainedModel):
         torch_dtype: torch.dtype | None = None,
         device: str | torch.device | None = None,
         quantization: str | None = None,
+        model_parallel: bool = False,
+        mp_devices: tuple[str, str] = ("cuda:0", "cuda:1"),
+        mp_split_layer: int | None = None,
+        head_dtype: torch.dtype | None = None,
         **backbone_kwargs,
     ) -> ClassOneModel:
         """Instantiates ClassOne with an existing HuggingFace backbone (e.g. Gemma 4 E2B).
@@ -288,6 +402,8 @@ class ClassOneModel(PreTrainedModel):
             kwargs = dict(backbone_kwargs)
             if torch_dtype is not None:
                 kwargs["torch_dtype"] = torch_dtype
+            if model_parallel and "low_cpu_mem_usage" not in kwargs:
+                kwargs["low_cpu_mem_usage"] = True
 
             cpu_quantize_8bit = False
             if quantization:
@@ -407,6 +523,15 @@ class ClassOneModel(PreTrainedModel):
 
         model = cls(config=config, backbone=backbone)
 
+        if model_parallel:
+            resolved_head_dtype = head_dtype or torch.float32
+            model.enable_model_parallel(
+                devices=mp_devices,
+                split_layer=mp_split_layer,
+                head_dtype=resolved_head_dtype,
+            )
+            return model
+
         # Determine target device
         if device is None:
             if torch.cuda.is_available():
@@ -489,7 +614,8 @@ class ClassOneModel(PreTrainedModel):
         position_ids: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Runs the backbone forward pass and retrieves sequence hidden states."""
-        target_device = self.device
+        target_device = self.input_device
+        out_device = self.output_device
         input_ids = input_ids.to(target_device)
         if attention_mask is not None:
             attention_mask = attention_mask.to(target_device)
@@ -501,7 +627,10 @@ class ClassOneModel(PreTrainedModel):
             x = self.embed(input_ids)
             has_padding = attention_mask is not None and bool((attention_mask == 0).any())
             padding_mask = (attention_mask == 0) if has_padding else None
-            return self.backbone(x, src_key_padding_mask=padding_mask)
+            hidden = self.backbone(x, src_key_padding_mask=padding_mask)
+            if hidden.device != out_device:
+                hidden = hidden.to(out_device)
+            return hidden
         else:
             # Hugging Face backbone
             kwargs = {}
@@ -515,8 +644,8 @@ class ClassOneModel(PreTrainedModel):
                 hidden = outputs[0]
 
             head_dtype = next(self.noul_head.parameters()).dtype
-            if hidden.dtype != head_dtype:
-                hidden = hidden.to(dtype=head_dtype)
+            if hidden.device != out_device or hidden.dtype != head_dtype:
+                hidden = hidden.to(device=out_device, dtype=head_dtype)
             return hidden
 
     def _score_question_span(self, seq_hidden: torch.Tensor, span: Any) -> Result:
@@ -617,15 +746,17 @@ class ClassOneModel(PreTrainedModel):
         self.eval()
         batch_size = len(batch)
         max_len = max(p.input_ids.shape[1] for p in batch)
+        in_dev = self.input_device
+        out_dev = self.output_device
 
         # Allocate padded tensors
-        batched_input_ids = torch.full((batch_size, max_len), pad_token_id, dtype=torch.long, device=self.device)
-        batched_attention_mask = torch.zeros((batch_size, max_len), dtype=torch.long, device=self.device)
+        batched_input_ids = torch.full((batch_size, max_len), pad_token_id, dtype=torch.long, device=in_dev)
+        batched_attention_mask = torch.zeros((batch_size, max_len), dtype=torch.long, device=in_dev)
 
         for b, p in enumerate(batch):
             seq_len = p.input_ids.shape[1]
-            batched_input_ids[b, :seq_len] = p.input_ids[0].to(self.device)
-            batched_attention_mask[b, :seq_len] = p.attention_mask[0].to(self.device)
+            batched_input_ids[b, :seq_len] = p.input_ids[0].to(in_dev)
+            batched_attention_mask[b, :seq_len] = p.attention_mask[0].to(in_dev)
 
         with torch.no_grad():
             if len(batch) == 1 and position_invariant and not hasattr(self, "embed") and max_len <= max_2d_mask_tokens:
@@ -634,7 +765,7 @@ class ClassOneModel(PreTrainedModel):
                 )
                 if has_options:
                     mask_dtype = self._backbone_float_dtype()
-                    mask_4d, pos_ids = self.build_position_invariant_mask(batch[0], self.device, dtype=mask_dtype)
+                    mask_4d, pos_ids = self.build_position_invariant_mask(batch[0], in_dev, dtype=mask_dtype)
                     hidden_states = self.extract_hidden_states(
                         batched_input_ids, attention_mask=mask_4d, position_ids=pos_ids
                     )
@@ -650,8 +781,8 @@ class ClassOneModel(PreTrainedModel):
 
             for b, p in enumerate(batch):
                 seq_hidden = hidden_states[b]
-                if seq_hidden.dtype != head_dtype:
-                    seq_hidden = seq_hidden.to(head_dtype)
+                if seq_hidden.device != out_dev or seq_hidden.dtype != head_dtype:
+                    seq_hidden = seq_hidden.to(device=out_dev, dtype=head_dtype)
 
                 answers: dict[str, Result] = {}
                 for q_id, span in p.questions.items():
@@ -704,7 +835,9 @@ class ClassOneModel(PreTrainedModel):
             options_in_prefix=options_in_prefix,
             preamble_questions=questions,
         )
-        prefix_ids = prefix_packed.input_ids.to(self.device)
+        in_dev = self.input_device
+        out_dev = self.output_device
+        prefix_ids = prefix_packed.input_ids.to(in_dev)
         prefix_len = int(prefix_ids.shape[1])
         if max_tokens is not None and prefix_len > max_tokens:
             raise ValueError(f"Prompt length ({prefix_len} tokens) exceeds maximum context length ({max_tokens}).")
@@ -748,7 +881,7 @@ class ClassOneModel(PreTrainedModel):
                     options_in_prefix=options_in_prefix,
                     preamble_questions=questions,
                 )
-                full_ids = q_packed.input_ids.to(self.device)
+                full_ids = q_packed.input_ids.to(in_dev)
                 total_len = int(full_ids.shape[1])
                 if max_tokens is not None and total_len > max_tokens:
                     raise ValueError(
@@ -764,7 +897,7 @@ class ClassOneModel(PreTrainedModel):
                 has_options = len(getattr(span, "option_token_spans", [])) > 1
 
                 if position_invariant and has_options and total_len <= max_2d_mask_tokens:
-                    mask_4d, pos_ids = self.build_position_invariant_mask(q_packed, self.device, dtype=mask_dtype)
+                    mask_4d, pos_ids = self.build_position_invariant_mask(q_packed, in_dev, dtype=mask_dtype)
                     suffix_mask_4d = mask_4d[:, :, prefix_len:, :]
                     suffix_pos_ids = pos_ids[:, prefix_len:]
                     mask_arg = self._wrap_4d_attention_mask(suffix_mask_4d)
@@ -776,7 +909,7 @@ class ClassOneModel(PreTrainedModel):
                         use_cache=False,
                     )
                 else:
-                    full_mask = torch.ones((1, total_len), dtype=torch.long, device=self.device)
+                    full_mask = torch.ones((1, total_len), dtype=torch.long, device=in_dev)
                     q_out = self.backbone(
                         input_ids=suffix_ids,
                         attention_mask=full_mask,
@@ -785,8 +918,8 @@ class ClassOneModel(PreTrainedModel):
                     )
 
                 seq_hidden = q_out.last_hidden_state[0] if hasattr(q_out, "last_hidden_state") else q_out[0][0]
-                if seq_hidden.dtype != head_dtype:
-                    seq_hidden = seq_hidden.to(head_dtype)
+                if seq_hidden.device != out_dev or seq_hidden.dtype != head_dtype:
+                    seq_hidden = seq_hidden.to(device=out_dev, dtype=head_dtype)
 
                 # Shift span indices by prefix_len to index into suffix seq_hidden
                 shifted_span = copy.copy(span)

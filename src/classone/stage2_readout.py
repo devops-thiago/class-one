@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 import torch.nn.functional as F
+from torch import nn
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from classone.modeling.modeling_classone import ClassOneModel, _round_probability_distribution
@@ -276,15 +277,115 @@ class ChatDecisionPromptBuilder:
         raise ValueError(f"Unsupported question type: {type(question)}")
 
 
+class CodebookLMHead(nn.Module):
+    """Frozen lm_head row slice covering single-token codebook and Yes/No label IDs."""
+
+    def __init__(self, weight_slice: torch.Tensor, token_ids: list[int]):
+        super().__init__()
+        if weight_slice.ndim != 2 or weight_slice.shape[0] != len(token_ids):
+            raise ValueError(
+                f"Expected weight_slice shape ({len(token_ids)}, hidden_size), got {tuple(weight_slice.shape)}"
+            )
+        self.register_buffer("weight", weight_slice, persistent=True)
+        self.token_ids = [int(t) for t in token_ids]
+        self.token_to_row = {int(t): idx for idx, t in enumerate(self.token_ids)}
+
+    def select_rows(self, label_token_ids: list[int]) -> torch.Tensor:
+        """Selects rows matching requested vocabulary token IDs."""
+        rows = []
+        for tid in label_token_ids:
+            tid_int = int(tid)
+            if tid_int not in self.token_to_row:
+                raise KeyError(f"Token ID {tid_int} is not in CodebookLMHead slice ({len(self.token_ids)} tokens).")
+            rows.append(self.token_to_row[tid_int])
+        row_idx = torch.tensor(rows, device=self.weight.device, dtype=torch.long)
+        return self.weight.index_select(0, row_idx)
+
+    def forward(self, h_query: torch.Tensor, label_token_ids: list[int] | None = None) -> torch.Tensor:
+        """Projects query hidden vector(s) onto sliced lm_head vocabulary rows."""
+        w = self.weight if label_token_ids is None else self.select_rows(label_token_ids)
+        return F.linear(h_query.to(w.dtype), w)
+
+
+def _resolve_local_model_dir(model_path: str) -> pathlib.Path:
+    p = pathlib.Path(model_path)
+    if p.is_dir():
+        return p
+    from huggingface_hub import snapshot_download
+
+    return pathlib.Path(snapshot_download(model_path, local_files_only=True))
+
+
+def load_codebook_lm_head(
+    model_path: str,
+    chat_builder: ChatDecisionPromptBuilder,
+    device: str | torch.device,
+    dtype: torch.dtype = torch.bfloat16,
+    include_yes_no: bool = True,
+) -> CodebookLMHead | None:
+    """Loads a frozen lm_head codebook slice for untied backbones, or returns None when embeddings are tied."""
+    from safetensors import safe_open
+
+    model_dir = _resolve_local_model_dir(model_path)
+    cfg_path = model_dir / "config.json"
+    if not cfg_path.exists():
+        return None
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    tie_top = cfg.get("tie_word_embeddings")
+    tie_tc = (cfg.get("text_config") or {}).get("tie_word_embeddings")
+    if tie_top is not False and tie_tc is not False:
+        return None
+
+    idx_path = model_dir / "model.safetensors.index.json"
+    if idx_path.exists():
+        weight_map = json.loads(idx_path.read_text(encoding="utf-8")).get("weight_map", {})
+        if "lm_head.weight" not in weight_map:
+            return None
+        shard_path = model_dir / weight_map["lm_head.weight"]
+    elif (model_dir / "model.safetensors").exists():
+        shard_path = model_dir / "model.safetensors"
+    else:
+        return None
+
+    token_ids: list[int] = []
+    seen: set[int] = set()
+    for _, tid in chat_builder.codebook:
+        tid_int = int(tid)
+        if tid_int not in seen:
+            token_ids.append(tid_int)
+            seen.add(tid_int)
+    if include_yes_no:
+        for tid in chat_builder.yes_no_ids:
+            tid_int = int(tid)
+            if tid_int not in seen:
+                token_ids.append(tid_int)
+                seen.add(tid_int)
+
+    with safe_open(str(shard_path), framework="pt", device="cpu") as f:
+        if "lm_head.weight" not in f.keys():
+            return None
+        full_w = f.get_tensor("lm_head.weight")
+        idx_t = torch.tensor(token_ids, dtype=torch.long)
+        slice_w = full_w.index_select(0, idx_t).to(dtype=dtype).contiguous().to(device)
+        del full_w
+
+    return CodebookLMHead(slice_w, token_ids)
+
+
 def compute_lm_letter_logits(
     h_query: torch.Tensor,
-    embed_weight: torch.Tensor,
+    embed_weight: torch.Tensor | CodebookLMHead,
     label_token_ids: list[int],
     scale: float = 1.0,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Scores candidate single-token option labels directly through tied/LM-head embeddings."""
-    cand_ids = torch.tensor(label_token_ids, device=h_query.device, dtype=torch.long)
-    w_cand = embed_weight.index_select(0, cand_ids)
+    """Scores candidate single-token option labels through a codebook slice or full vocab embedding matrix."""
+    if hasattr(embed_weight, "select_rows"):
+        w_cand = embed_weight.select_rows(label_token_ids)
+    else:
+        cand_ids = torch.tensor(label_token_ids, device=embed_weight.device, dtype=torch.long)
+        w_cand = embed_weight.index_select(0, cand_ids)
+    if w_cand.device != h_query.device:
+        w_cand = w_cand.to(h_query.device)
     # Compute in embed_weight's dtype (BF16 on GPU) then cast logits to FP32 for stable softmax
     logits = F.linear(h_query.to(w_cand.dtype).unsqueeze(0), w_cand).float().squeeze(0) * scale
     probs = F.softmax(logits, dim=-1)
@@ -404,7 +505,7 @@ def _pack_with_truncation(
 def _eval_stage2_choice_single_pass(
     model: ClassOneModel,
     chat_builder: ChatDecisionPromptBuilder,
-    embed_w: torch.Tensor,
+    embed_w: torch.Tensor | CodebookLMHead,
     state: Any,
     q_id: str,
     question: ChoiceQuestion,
@@ -420,11 +521,11 @@ def _eval_stage2_choice_single_pass(
         truncate_chars=max_tokens * 2,
     )
     seq_tokens = int(packed.input_ids.shape[1])
-    dev = model.device
+    in_dev = model.input_device
     with torch.no_grad():
         hs = model.extract_hidden_states(
-            input_ids=packed.input_ids.to(dev),
-            attention_mask=packed.attention_mask.to(dev),
+            input_ids=packed.input_ids.to(in_dev),
+            attention_mask=packed.attention_mask.to(in_dev),
         )
         span = packed.questions[q_id]
         h_q = hs[0][span.query_token_idx]
@@ -450,12 +551,14 @@ def evaluate_stage2_request(
 ) -> tuple[dict[str, Result], int]:
     """Evaluates a DecisionRequest using Stage 2 LM-head letter readout and M2 shortlist routing."""
     model.eval()
-    if hasattr(model, "embed"):
+    if getattr(model, "lm_readout_head", None) is not None:
+        embed_w = model.lm_readout_head
+    elif hasattr(model, "embed"):
         embed_w = model.embed.weight
     else:
         embed_w = model.backbone.get_input_embeddings().weight
     head_dtype = next(model.noul_head.parameters()).dtype
-    dev = model.device
+    in_dev = model.input_device
     answers: dict[str, Result] = {}
     total_input_tokens = 0
 
@@ -523,8 +626,8 @@ def evaluate_stage2_request(
             total_input_tokens += int(packed.input_ids.shape[1])
             with torch.no_grad():
                 hs = model.extract_hidden_states(
-                    packed.input_ids.to(dev),
-                    packed.attention_mask.to(dev),
+                    packed.input_ids.to(in_dev),
+                    packed.attention_mask.to(in_dev),
                 )
                 answers[q_id] = model._score_question_span(
                     hs[0].to(head_dtype),
