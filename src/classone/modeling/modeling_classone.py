@@ -548,11 +548,35 @@ class ClassOneModel(PreTrainedModel):
         if effective_dtype is None and not is_quantized and target_device.type != "cpu" and cls_eval_mode == "stage2":
             effective_dtype = torch.bfloat16
 
+        backbone_cfg = getattr(backbone, "config", None)
+        backbone_model_type = str(getattr(backbone_cfg, "model_type", "") or "").lower()
+        text_model_type = str(getattr(text_config, "model_type", "") or "").lower()
+        is_gemma4 = ("gemma4" in backbone_model_type) or ("gemma4" in text_model_type)
+
         if is_quantized:
             head_dtype = torch_dtype or torch.float16
             model.noul_head.to(device=target_device, dtype=head_dtype)
             model.choice_head.to(device=target_device, dtype=head_dtype)
             model.score_head.to(device=target_device, dtype=head_dtype)
+        elif is_gemma4 and effective_dtype is not None:
+            # Gemma 4 stores RoPE inv_freq buffers in FP32; calling model.to(dtype=bfloat16) corrupts them.
+            if not isinstance(base_model_name_or_path, nn.Module) and torch_dtype is not None:
+                model.backbone.to(device=target_device)
+            else:
+                saved_inv_freq = {
+                    name: buf.detach().clone()
+                    for name, buf in model.backbone.named_buffers()
+                    if "inv_freq" in name and buf.dtype == torch.float32
+                }
+                model.backbone.to(device=target_device, dtype=effective_dtype)
+                for name, buf in model.backbone.named_buffers():
+                    if name in saved_inv_freq:
+                        buf.data = saved_inv_freq[name].to(device=target_device, dtype=torch.float32)
+
+            resolved_head_dtype = head_dtype or torch.float32
+            model.noul_head.to(device=target_device, dtype=resolved_head_dtype)
+            model.choice_head.to(device=target_device, dtype=resolved_head_dtype)
+            model.score_head.to(device=target_device, dtype=resolved_head_dtype)
         elif effective_dtype is not None:
             model.to(device=target_device, dtype=effective_dtype)
         else:

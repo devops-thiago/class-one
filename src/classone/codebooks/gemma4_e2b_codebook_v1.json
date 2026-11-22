@@ -1,0 +1,1101 @@
+{
+  "version": "gemma4_e2b_codebook_v1",
+  "base_model": "google/gemma-4-e2b-it",
+  "base_revision": "3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+  "vocab_size": 262144,
+  "max_k": 180,
+  "yes_token": {
+    "label": "Yes",
+    "token_id": 10784,
+    "leading_space_token_id": 8438
+  },
+  "no_token": {
+    "label": "No",
+    "token_id": 3771,
+    "leading_space_token_id": 2301
+  },
+  "single_token_leading_space_count": 163,
+  "leading_space_collisions": 0,
+  "entries": [
+    {
+      "index": 0,
+      "label": "A",
+      "token_id": 236776,
+      "leading_space_token_id": 562
+    },
+    {
+      "index": 1,
+      "label": "B",
+      "token_id": 236799,
+      "leading_space_token_id": 603
+    },
+    {
+      "index": 2,
+      "label": "C",
+      "token_id": 236780,
+      "leading_space_token_id": 565
+    },
+    {
+      "index": 3,
+      "label": "D",
+      "token_id": 236796,
+      "leading_space_token_id": 622
+    },
+    {
+      "index": 4,
+      "label": "E",
+      "token_id": 236788,
+      "leading_space_token_id": 645
+    },
+    {
+      "index": 5,
+      "label": "F",
+      "token_id": 236811,
+      "leading_space_token_id": 633
+    },
+    {
+      "index": 6,
+      "label": "G",
+      "token_id": 236823,
+      "leading_space_token_id": 667
+    },
+    {
+      "index": 7,
+      "label": "H",
+      "token_id": 236814,
+      "leading_space_token_id": 640
+    },
+    {
+      "index": 8,
+      "label": "I",
+      "token_id": 236777,
+      "leading_space_token_id": 564
+    },
+    {
+      "index": 9,
+      "label": "J",
+      "token_id": 236863,
+      "leading_space_token_id": 730
+    },
+    {
+      "index": 10,
+      "label": "K",
+      "token_id": 236855,
+      "leading_space_token_id": 751
+    },
+    {
+      "index": 11,
+      "label": "L",
+      "token_id": 236798,
+      "leading_space_token_id": 639
+    },
+    {
+      "index": 12,
+      "label": "M",
+      "token_id": 236792,
+      "leading_space_token_id": 587
+    },
+    {
+      "index": 13,
+      "label": "N",
+      "token_id": 236797,
+      "leading_space_token_id": 646
+    },
+    {
+      "index": 14,
+      "label": "O",
+      "token_id": 236806,
+      "leading_space_token_id": 708
+    },
+    {
+      "index": 15,
+      "label": "P",
+      "token_id": 236791,
+      "leading_space_token_id": 593
+    },
+    {
+      "index": 16,
+      "label": "Q",
+      "token_id": 236935,
+      "leading_space_token_id": 1366
+    },
+    {
+      "index": 17,
+      "label": "R",
+      "token_id": 236794,
+      "leading_space_token_id": 630
+    },
+    {
+      "index": 18,
+      "label": "S",
+      "token_id": 236773,
+      "leading_space_token_id": 555
+    },
+    {
+      "index": 19,
+      "label": "T",
+      "token_id": 236774,
+      "leading_space_token_id": 558
+    },
+    {
+      "index": 20,
+      "label": "U",
+      "token_id": 236836,
+      "leading_space_token_id": 749
+    },
+    {
+      "index": 21,
+      "label": "V",
+      "token_id": 236847,
+      "leading_space_token_id": 782
+    },
+    {
+      "index": 22,
+      "label": "W",
+      "token_id": 236824,
+      "leading_space_token_id": 649
+    },
+    {
+      "index": 23,
+      "label": "X",
+      "token_id": 236917,
+      "leading_space_token_id": 1684
+    },
+    {
+      "index": 24,
+      "label": "Y",
+      "token_id": 236874,
+      "leading_space_token_id": 895
+    },
+    {
+      "index": 25,
+      "label": "Z",
+      "token_id": 236953,
+      "leading_space_token_id": 1491
+    },
+    {
+      "index": 26,
+      "label": "a",
+      "token_id": 236746,
+      "leading_space_token_id": 496
+    },
+    {
+      "index": 27,
+      "label": "b",
+      "token_id": 236763,
+      "leading_space_token_id": 518
+    },
+    {
+      "index": 28,
+      "label": "c",
+      "token_id": 236755,
+      "leading_space_token_id": 505
+    },
+    {
+      "index": 29,
+      "label": "d",
+      "token_id": 236753,
+      "leading_space_token_id": 513
+    },
+    {
+      "index": 30,
+      "label": "e",
+      "token_id": 236744,
+      "leading_space_token_id": 545
+    },
+    {
+      "index": 31,
+      "label": "f",
+      "token_id": 236760,
+      "leading_space_token_id": 517
+    },
+    {
+      "index": 32,
+      "label": "g",
+      "token_id": 236759,
+      "leading_space_token_id": 549
+    },
+    {
+      "index": 33,
+      "label": "h",
+      "token_id": 236754,
+      "leading_space_token_id": 534
+    },
+    {
+      "index": 34,
+      "label": "i",
+      "token_id": 236747,
+      "leading_space_token_id": 858
+    },
+    {
+      "index": 35,
+      "label": "j",
+      "token_id": 236804,
+      "leading_space_token_id": 673
+    },
+    {
+      "index": 36,
+      "label": "k",
+      "token_id": 236767,
+      "leading_space_token_id": 620
+    },
+    {
+      "index": 37,
+      "label": "l",
+      "token_id": 236752,
+      "leading_space_token_id": 537
+    },
+    {
+      "index": 38,
+      "label": "m",
+      "token_id": 236757,
+      "leading_space_token_id": 520
+    },
+    {
+      "index": 39,
+      "label": "n",
+      "token_id": 236749,
+      "leading_space_token_id": 538
+    },
+    {
+      "index": 40,
+      "label": "o",
+      "token_id": 236748,
+      "leading_space_token_id": 512
+    },
+    {
+      "index": 41,
+      "label": "p",
+      "token_id": 236758,
+      "leading_space_token_id": 510
+    },
+    {
+      "index": 42,
+      "label": "q",
+      "token_id": 236809,
+      "leading_space_token_id": 3752
+    },
+    {
+      "index": 43,
+      "label": "r",
+      "token_id": 236750,
+      "leading_space_token_id": 637
+    },
+    {
+      "index": 44,
+      "label": "s",
+      "token_id": 236751,
+      "leading_space_token_id": 503
+    },
+    {
+      "index": 45,
+      "label": "t",
+      "token_id": 236745,
+      "leading_space_token_id": 494
+    },
+    {
+      "index": 46,
+      "label": "u",
+      "token_id": 236756,
+      "leading_space_token_id": 559
+    },
+    {
+      "index": 47,
+      "label": "v",
+      "token_id": 236766,
+      "leading_space_token_id": 566
+    },
+    {
+      "index": 48,
+      "label": "w",
+      "token_id": 236765,
+      "leading_space_token_id": 515
+    },
+    {
+      "index": 49,
+      "label": "x",
+      "token_id": 236781,
+      "leading_space_token_id": 1123
+    },
+    {
+      "index": 50,
+      "label": "y",
+      "token_id": 236762,
+      "leading_space_token_id": 570
+    },
+    {
+      "index": 51,
+      "label": "z",
+      "token_id": 236802,
+      "leading_space_token_id": 904
+    },
+    {
+      "index": 52,
+      "label": "0",
+      "token_id": 236771,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 53,
+      "label": "1",
+      "token_id": 236770,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 54,
+      "label": "2",
+      "token_id": 236778,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 55,
+      "label": "3",
+      "token_id": 236800,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 56,
+      "label": "4",
+      "token_id": 236812,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 57,
+      "label": "5",
+      "token_id": 236810,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 58,
+      "label": "6",
+      "token_id": 236825,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 59,
+      "label": "7",
+      "token_id": 236832,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 60,
+      "label": "8",
+      "token_id": 236828,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 61,
+      "label": "9",
+      "token_id": 236819,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 62,
+      "label": "Α",
+      "token_id": 238339,
+      "leading_space_token_id": 20306
+    },
+    {
+      "index": 63,
+      "label": "Β",
+      "token_id": 240104,
+      "leading_space_token_id": 48461
+    },
+    {
+      "index": 64,
+      "label": "Γ",
+      "token_id": 239357,
+      "leading_space_token_id": 33911
+    },
+    {
+      "index": 65,
+      "label": "Δ",
+      "token_id": 238507,
+      "leading_space_token_id": 19184
+    },
+    {
+      "index": 66,
+      "label": "Ε",
+      "token_id": 238600,
+      "leading_space_token_id": 23883
+    },
+    {
+      "index": 67,
+      "label": "Ζ",
+      "token_id": 242411,
+      "leading_space_token_id": 160886
+    },
+    {
+      "index": 68,
+      "label": "Η",
+      "token_id": 239224,
+      "leading_space_token_id": 45026
+    },
+    {
+      "index": 69,
+      "label": "Θ",
+      "token_id": 240947,
+      "leading_space_token_id": 83416
+    },
+    {
+      "index": 70,
+      "label": "Ι",
+      "token_id": 239139,
+      "leading_space_token_id": 55707
+    },
+    {
+      "index": 71,
+      "label": "Κ",
+      "token_id": 238838,
+      "leading_space_token_id": 24272
+    },
+    {
+      "index": 72,
+      "label": "Λ",
+      "token_id": 239910,
+      "leading_space_token_id": 61025
+    },
+    {
+      "index": 73,
+      "label": "Μ",
+      "token_id": 238955,
+      "leading_space_token_id": 26529
+    },
+    {
+      "index": 74,
+      "label": "Ν",
+      "token_id": 239466,
+      "leading_space_token_id": 46530
+    },
+    {
+      "index": 75,
+      "label": "Ξ",
+      "token_id": 242859,
+      "leading_space_token_id": 218134
+    },
+    {
+      "index": 76,
+      "label": "Ο",
+      "token_id": 238747,
+      "leading_space_token_id": 33419
+    },
+    {
+      "index": 77,
+      "label": "Π",
+      "token_id": 238782,
+      "leading_space_token_id": 23586
+    },
+    {
+      "index": 78,
+      "label": "Ρ",
+      "token_id": 240032,
+      "leading_space_token_id": 83503
+    },
+    {
+      "index": 79,
+      "label": "Σ",
+      "token_id": 238509,
+      "leading_space_token_id": 21930
+    },
+    {
+      "index": 80,
+      "label": "Τ",
+      "token_id": 238744,
+      "leading_space_token_id": 26729
+    },
+    {
+      "index": 81,
+      "label": "Υ",
+      "token_id": 240269,
+      "leading_space_token_id": 94792
+    },
+    {
+      "index": 82,
+      "label": "Φ",
+      "token_id": 240283,
+      "leading_space_token_id": 63401
+    },
+    {
+      "index": 83,
+      "label": "Χ",
+      "token_id": 240425,
+      "leading_space_token_id": 62271
+    },
+    {
+      "index": 84,
+      "label": "Ψ",
+      "token_id": 242956,
+      "leading_space_token_id": 218754
+    },
+    {
+      "index": 85,
+      "label": "Ω",
+      "token_id": 239995,
+      "leading_space_token_id": 76858
+    },
+    {
+      "index": 86,
+      "label": "Ϊ",
+      "token_id": 249110,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 87,
+      "label": "ά",
+      "token_id": 237385,
+      "leading_space_token_id": 32782
+    },
+    {
+      "index": 88,
+      "label": "έ",
+      "token_id": 237453,
+      "leading_space_token_id": 13712
+    },
+    {
+      "index": 89,
+      "label": "ή",
+      "token_id": 237569,
+      "leading_space_token_id": 29642
+    },
+    {
+      "index": 90,
+      "label": "ί",
+      "token_id": 237316,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 91,
+      "label": "ΰ",
+      "token_id": 254387,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 92,
+      "label": "α",
+      "token_id": 237003,
+      "leading_space_token_id": 4964
+    },
+    {
+      "index": 93,
+      "label": "β",
+      "token_id": 237912,
+      "leading_space_token_id": 17992
+    },
+    {
+      "index": 94,
+      "label": "γ",
+      "token_id": 237416,
+      "leading_space_token_id": 11122
+    },
+    {
+      "index": 95,
+      "label": "δ",
+      "token_id": 237476,
+      "leading_space_token_id": 8566
+    },
+    {
+      "index": 96,
+      "label": "ε",
+      "token_id": 237061,
+      "leading_space_token_id": 5722
+    },
+    {
+      "index": 97,
+      "label": "ζ",
+      "token_id": 238564,
+      "leading_space_token_id": 51275
+    },
+    {
+      "index": 98,
+      "label": "η",
+      "token_id": 237185,
+      "leading_space_token_id": 17546
+    },
+    {
+      "index": 99,
+      "label": "θ",
+      "token_id": 237675,
+      "leading_space_token_id": 17139
+    },
+    {
+      "index": 100,
+      "label": "ι",
+      "token_id": 237056,
+      "leading_space_token_id": 206483
+    },
+    {
+      "index": 101,
+      "label": "κ",
+      "token_id": 237160,
+      "leading_space_token_id": 4851
+    },
+    {
+      "index": 102,
+      "label": "λ",
+      "token_id": 237253,
+      "leading_space_token_id": 20254
+    },
+    {
+      "index": 103,
+      "label": "μ",
+      "token_id": 237181,
+      "leading_space_token_id": 5458
+    },
+    {
+      "index": 104,
+      "label": "ν",
+      "token_id": 237071,
+      "leading_space_token_id": 36426
+    },
+    {
+      "index": 105,
+      "label": "ξ",
+      "token_id": 238363,
+      "leading_space_token_id": 74645
+    },
+    {
+      "index": 106,
+      "label": "ο",
+      "token_id": 237037,
+      "leading_space_token_id": 11232
+    },
+    {
+      "index": 107,
+      "label": "π",
+      "token_id": 237161,
+      "leading_space_token_id": 4609
+    },
+    {
+      "index": 108,
+      "label": "ρ",
+      "token_id": 237129,
+      "leading_space_token_id": 104774
+    },
+    {
+      "index": 109,
+      "label": "ς",
+      "token_id": 237220,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 110,
+      "label": "σ",
+      "token_id": 237121,
+      "leading_space_token_id": 4824
+    },
+    {
+      "index": 111,
+      "label": "τ",
+      "token_id": 237038,
+      "leading_space_token_id": 3081
+    },
+    {
+      "index": 112,
+      "label": "υ",
+      "token_id": 237217,
+      "leading_space_token_id": 24207
+    },
+    {
+      "index": 113,
+      "label": "φ",
+      "token_id": 237813,
+      "leading_space_token_id": 20542
+    },
+    {
+      "index": 114,
+      "label": "χ",
+      "token_id": 237645,
+      "leading_space_token_id": 17091
+    },
+    {
+      "index": 115,
+      "label": "ψ",
+      "token_id": 239465,
+      "leading_space_token_id": 93851
+    },
+    {
+      "index": 116,
+      "label": "ω",
+      "token_id": 237515,
+      "leading_space_token_id": 83718
+    },
+    {
+      "index": 117,
+      "label": "А",
+      "token_id": 237228,
+      "leading_space_token_id": 4097
+    },
+    {
+      "index": 118,
+      "label": "Б",
+      "token_id": 237359,
+      "leading_space_token_id": 4632
+    },
+    {
+      "index": 119,
+      "label": "В",
+      "token_id": 237146,
+      "leading_space_token_id": 3122
+    },
+    {
+      "index": 120,
+      "label": "Г",
+      "token_id": 237513,
+      "leading_space_token_id": 6491
+    },
+    {
+      "index": 121,
+      "label": "Д",
+      "token_id": 237304,
+      "leading_space_token_id": 4700
+    },
+    {
+      "index": 122,
+      "label": "Е",
+      "token_id": 237571,
+      "leading_space_token_id": 8682
+    },
+    {
+      "index": 123,
+      "label": "Ж",
+      "token_id": 238444,
+      "leading_space_token_id": 23706
+    },
+    {
+      "index": 124,
+      "label": "З",
+      "token_id": 237590,
+      "leading_space_token_id": 8119
+    },
+    {
+      "index": 125,
+      "label": "И",
+      "token_id": 237363,
+      "leading_space_token_id": 5752
+    },
+    {
+      "index": 126,
+      "label": "Й",
+      "token_id": 239526,
+      "leading_space_token_id": 61438
+    },
+    {
+      "index": 127,
+      "label": "К",
+      "token_id": 237180,
+      "leading_space_token_id": 3391
+    },
+    {
+      "index": 128,
+      "label": "Л",
+      "token_id": 237612,
+      "leading_space_token_id": 8068
+    },
+    {
+      "index": 129,
+      "label": "М",
+      "token_id": 237271,
+      "leading_space_token_id": 4015
+    },
+    {
+      "index": 130,
+      "label": "Н",
+      "token_id": 237240,
+      "leading_space_token_id": 4262
+    },
+    {
+      "index": 131,
+      "label": "О",
+      "token_id": 237248,
+      "leading_space_token_id": 4584
+    },
+    {
+      "index": 132,
+      "label": "П",
+      "token_id": 237134,
+      "leading_space_token_id": 3042
+    },
+    {
+      "index": 133,
+      "label": "Р",
+      "token_id": 237321,
+      "leading_space_token_id": 4982
+    },
+    {
+      "index": 134,
+      "label": "С",
+      "token_id": 237117,
+      "leading_space_token_id": 2965
+    },
+    {
+      "index": 135,
+      "label": "Т",
+      "token_id": 237318,
+      "leading_space_token_id": 4840
+    },
+    {
+      "index": 136,
+      "label": "У",
+      "token_id": 237533,
+      "leading_space_token_id": 6991
+    },
+    {
+      "index": 137,
+      "label": "Ф",
+      "token_id": 237734,
+      "leading_space_token_id": 8952
+    },
+    {
+      "index": 138,
+      "label": "Х",
+      "token_id": 237941,
+      "leading_space_token_id": 11492
+    },
+    {
+      "index": 139,
+      "label": "Ц",
+      "token_id": 238373,
+      "leading_space_token_id": 17883
+    },
+    {
+      "index": 140,
+      "label": "Ч",
+      "token_id": 237856,
+      "leading_space_token_id": 10948
+    },
+    {
+      "index": 141,
+      "label": "Ш",
+      "token_id": 238160,
+      "leading_space_token_id": 15641
+    },
+    {
+      "index": 142,
+      "label": "Щ",
+      "token_id": 240367,
+      "leading_space_token_id": 71421
+    },
+    {
+      "index": 143,
+      "label": "Ъ",
+      "token_id": 243439,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 144,
+      "label": "Ы",
+      "token_id": 240371,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 145,
+      "label": "Ь",
+      "token_id": 240229,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 146,
+      "label": "Э",
+      "token_id": 237887,
+      "leading_space_token_id": 10447
+    },
+    {
+      "index": 147,
+      "label": "Ю",
+      "token_id": 238960,
+      "leading_space_token_id": 25743
+    },
+    {
+      "index": 148,
+      "label": "Я",
+      "token_id": 237998,
+      "leading_space_token_id": 12596
+    },
+    {
+      "index": 149,
+      "label": "а",
+      "token_id": 236808,
+      "leading_space_token_id": 1943
+    },
+    {
+      "index": 150,
+      "label": "б",
+      "token_id": 236915,
+      "leading_space_token_id": 1469
+    },
+    {
+      "index": 151,
+      "label": "в",
+      "token_id": 236851,
+      "leading_space_token_id": 909
+    },
+    {
+      "index": 152,
+      "label": "г",
+      "token_id": 236912,
+      "leading_space_token_id": 3176
+    },
+    {
+      "index": 153,
+      "label": "д",
+      "token_id": 236870,
+      "leading_space_token_id": 1167
+    },
+    {
+      "index": 154,
+      "label": "е",
+      "token_id": 236815,
+      "leading_space_token_id": 3053
+    },
+    {
+      "index": 155,
+      "label": "ж",
+      "token_id": 236966,
+      "leading_space_token_id": 11028
+    },
+    {
+      "index": 156,
+      "label": "з",
+      "token_id": 236906,
+      "leading_space_token_id": 1529
+    },
+    {
+      "index": 157,
+      "label": "и",
+      "token_id": 236817,
+      "leading_space_token_id": 1079
+    },
+    {
+      "index": 158,
+      "label": "й",
+      "token_id": 236934,
+      "leading_space_token_id": 17765
+    },
+    {
+      "index": 159,
+      "label": "к",
+      "token_id": 236860,
+      "leading_space_token_id": 2110
+    },
+    {
+      "index": 160,
+      "label": "л",
+      "token_id": 236853,
+      "leading_space_token_id": 45462
+    },
+    {
+      "index": 161,
+      "label": "м",
+      "token_id": 236866,
+      "leading_space_token_id": 1318
+    },
+    {
+      "index": 162,
+      "label": "н",
+      "token_id": 236822,
+      "leading_space_token_id": 29905
+    },
+    {
+      "index": 163,
+      "label": "о",
+      "token_id": 236801,
+      "leading_space_token_id": 1104
+    },
+    {
+      "index": 164,
+      "label": "п",
+      "token_id": 236877,
+      "leading_space_token_id": 843
+    },
+    {
+      "index": 165,
+      "label": "р",
+      "token_id": 236839,
+      "leading_space_token_id": 17021
+    },
+    {
+      "index": 166,
+      "label": "с",
+      "token_id": 236843,
+      "leading_space_token_id": 937
+    },
+    {
+      "index": 167,
+      "label": "т",
+      "token_id": 236827,
+      "leading_space_token_id": 3166
+    },
+    {
+      "index": 168,
+      "label": "у",
+      "token_id": 236876,
+      "leading_space_token_id": 1754
+    },
+    {
+      "index": 169,
+      "label": "ф",
+      "token_id": 237074,
+      "leading_space_token_id": 3288
+    },
+    {
+      "index": 170,
+      "label": "х",
+      "token_id": 236954,
+      "leading_space_token_id": 8198
+    },
+    {
+      "index": 171,
+      "label": "ц",
+      "token_id": 236993,
+      "leading_space_token_id": 8903
+    },
+    {
+      "index": 172,
+      "label": "ч",
+      "token_id": 236932,
+      "leading_space_token_id": 2382
+    },
+    {
+      "index": 173,
+      "label": "ш",
+      "token_id": 236992,
+      "leading_space_token_id": 8014
+    },
+    {
+      "index": 174,
+      "label": "щ",
+      "token_id": 237094,
+      "leading_space_token_id": 54594
+    },
+    {
+      "index": 175,
+      "label": "ъ",
+      "token_id": 237404,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 176,
+      "label": "ы",
+      "token_id": 236904,
+      "leading_space_token_id": 98490
+    },
+    {
+      "index": 177,
+      "label": "ь",
+      "token_id": 236921,
+      "leading_space_token_id": null
+    },
+    {
+      "index": 178,
+      "label": "э",
+      "token_id": 237111,
+      "leading_space_token_id": 2696
+    },
+    {
+      "index": 179,
+      "label": "ю",
+      "token_id": 237002,
+      "leading_space_token_id": 20399
+    }
+  ]
+}

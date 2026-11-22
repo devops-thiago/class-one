@@ -33,7 +33,12 @@ from transformers import AutoTokenizer
 from classone.modeling.loss import RLCDLoss
 from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
-from classone.stage2_readout import ChatDecisionPromptBuilder, compute_lm_letter_logits, load_codebook_lm_head
+from classone.stage2_readout import (
+    ChatDecisionPromptBuilder,
+    compute_lm_letter_logits,
+    load_codebook_lm_head,
+    strip_unused_multimodal_towers,
+)
 from classone.tokenizer import ClassOnePromptBuilder
 from classone.train.trainer import ClassOneTrainer
 
@@ -424,8 +429,8 @@ def run_stage2_worker(
         )
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, trust_remote_code=True, local_files_only=True)
-    co_builder = ClassOnePromptBuilder(tokenizer)
     chat_builder = ChatDecisionPromptBuilder(tokenizer) if args.arm.upper() == "A" else None
+    co_builder = ClassOnePromptBuilder(tokenizer)
 
     if is_mp:
         model = ClassOneModel.from_backbone(
@@ -448,7 +453,7 @@ def run_stage2_worker(
     if os.path.exists(heads_path):
         load_heads_matching_shapes(model, heads_path, output_device, rank)
 
-    if is_mp and chat_builder is not None:
+    if chat_builder is not None:
         codebook_head = load_codebook_lm_head(
             args.base_model,
             chat_builder,
@@ -461,14 +466,18 @@ def run_stage2_worker(
             if rank == 0:
                 print(
                     f"[Stage2 Arm {args.arm}] Loaded frozen CodebookLMHead slice "
-                    f"{tuple(codebook_head.weight.shape)} on {output_device}",
+                    f"{tuple(codebook_head.weight.shape)} on {output_device}"
+                    + (
+                        f" (softcap={codebook_head.final_logit_softcapping})"
+                        if codebook_head.final_logit_softcapping is not None
+                        else ""
+                    ),
                     flush=True,
                 )
 
-    if hasattr(model.backbone, "visual"):
-        del model.backbone.visual
-        model.backbone.visual = None
-        torch.cuda.empty_cache()
+    stripped_towers = strip_unused_multimodal_towers(model.backbone, clear_cuda_cache=True)
+    if stripped_towers and rank == 0:
+        print(f"[Stage2 Arm {args.arm}] Stripped unused multimodal towers: {stripped_towers}", flush=True)
 
     if hasattr(model.backbone, "gradient_checkpointing_enable"):
         model.backbone.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
@@ -622,20 +631,42 @@ def run_stage2_worker(
                 step_head_loss += item_hd_val / total_valid_q
                 del item_loss
 
-        if is_mp and step_idx == 1:
-            g0_nz = sum(
-                1
-                for p in model.parameters()
-                if p.requires_grad and p.device == input_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
-            )
-            g1_nz = sum(
-                1
-                for p in model.parameters()
-                if p.requires_grad and p.device == output_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
-            )
-            if g0_nz == 0 or g1_nz == 0:
-                raise RuntimeError(f"Model-parallel gradient check failed at step 1: {input_device}={g0_nz}, {output_device}={g1_nz}")
-            print(f"[MP Step 1 Grads Verified] {input_device}_nonzero={g0_nz}, {output_device}_nonzero={g1_nz}", flush=True)
+        if step_idx == 1:
+            if is_mp:
+                g0_nz = sum(
+                    1
+                    for p in model.parameters()
+                    if p.requires_grad and p.device == input_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                )
+                g1_nz = sum(
+                    1
+                    for p in model.parameters()
+                    if p.requires_grad and p.device == output_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                )
+                if g0_nz == 0 or g1_nz == 0:
+                    raise RuntimeError(f"Model-parallel gradient check failed at step 1: {input_device}={g0_nz}, {output_device}={g1_nz}")
+                print(f"[MP Step 1 Grads Verified] {input_device}_nonzero={g0_nz}, {output_device}_nonzero={g1_nz}", flush=True)
+            else:
+                lora_nz = sum(
+                    1
+                    for n, p in model.named_parameters()
+                    if "lora_" in n and p.requires_grad and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                )
+                head_nz = sum(
+                    1
+                    for n, p in model.named_parameters()
+                    if any(h in n for h in ("noul_head.", "choice_head.", "score_head."))
+                    and p.requires_grad
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
+                )
+                if lora_nz == 0 or head_nz == 0:
+                    raise RuntimeError(
+                        f"Step 1 gradient check failed on rank {rank}: lora_nonzero={lora_nz}, head_nonzero={head_nz}"
+                    )
+                if rank == 0:
+                    print(f"[Step 1 Grads Verified] lora_nonzero={lora_nz}, head_nonzero={head_nz}", flush=True)
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         if world_size > 1 and q_out is not None and q_in is not None:

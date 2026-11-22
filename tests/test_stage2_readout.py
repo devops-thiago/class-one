@@ -18,12 +18,16 @@ from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from classone.server import app as server_app
 from classone.stage2_readout import (
+    GEMMA4_CODEBOOK_V1_PATH,
     ChatDecisionPromptBuilder,
     CodebookLMHead,
+    build_gemma4_single_token_labels,
     build_single_token_labels,
     compute_lm_letter_logits,
+    detect_model_family,
     evaluate_stage2_request,
     load_codebook_lm_head,
+    strip_unused_multimodal_towers,
 )
 from classone.tokenizer import ClassOnePromptBuilder
 
@@ -427,3 +431,188 @@ def test_model_parallel_device_routing_and_backward() -> None:
     assert toks > 0
     assert answers["c1"].choice in {"x1", "x2"}
     assert 0.0 <= answers["n1"].noul <= 1.0
+
+
+def test_detect_model_family_and_strip_unused_multimodal_towers() -> None:
+    tok_qwen = _build_chat_test_tokenizer()
+    assert detect_model_family(tok_qwen) == "qwen"
+    assert detect_model_family({"model_type": "qwen3_5"}) == "qwen"
+    assert detect_model_family({"model_type": "gemma4", "text_config": {"model_type": "gemma4_text"}}) == "gemma4"
+    assert detect_model_family(None) == "default"
+
+    class _DummyGemmaBackbone(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.language_model = torch.nn.Linear(4, 4)
+            self.vision_tower = torch.nn.Linear(4, 4)
+            self.audio_tower = torch.nn.Linear(4, 4)
+            self.embed_vision = torch.nn.Linear(4, 4)
+            self.embed_audio = torch.nn.Linear(4, 4)
+
+    bb = _DummyGemmaBackbone()
+    stripped = strip_unused_multimodal_towers(bb, clear_cuda_cache=False)
+    assert set(stripped) == {"vision_tower", "audio_tower", "embed_vision", "embed_audio"}
+    assert bb.vision_tower is None
+    assert bb.audio_tower is None
+    assert isinstance(bb.language_model, torch.nn.Linear)
+
+
+def test_gemma4_codebook_v1_determinism_and_softcap_readout() -> None:
+    from pathlib import Path
+    from safetensors.torch import save_file
+
+    assert GEMMA4_CODEBOOK_V1_PATH.exists(), f"Missing versioned codebook: {GEMMA4_CODEBOOK_V1_PATH}"
+    payload = json.loads(GEMMA4_CODEBOOK_V1_PATH.read_text(encoding="utf-8"))
+    entries = payload["entries"]
+    assert payload["max_k"] == 180 and len(entries) == 180
+    assert payload["leading_space_collisions"] == 0
+
+    yes_id = int(payload["yes_token"]["token_id"])
+    no_id = int(payload["no_token"]["token_id"])
+    ids = [int(e["token_id"]) for e in entries]
+    labels = [str(e["label"]) for e in entries]
+    assert len(set(ids)) == 180
+    assert len(set(labels)) == 180
+    assert all(len(lbl) == 1 and lbl.isalnum() for lbl in labels)
+    assert yes_id not in ids and no_id not in ids and yes_id != no_id
+
+    # Verify CodebookLMHead & compute_lm_letter_logits softcapping parity + gradients
+    torch.manual_seed(7)
+    w_rows = torch.randn(6, 16, dtype=torch.bfloat16) * 2.5
+    row_ids = [10, 11, 12, 13, 14, 15]
+    cb_soft = CodebookLMHead(w_rows, row_ids, final_logit_softcapping=30.0)
+    h_q = torch.randn(16, dtype=torch.bfloat16, requires_grad=True)
+    probs, logits = compute_lm_letter_logits(h_q, cb_soft, [10, 12, 14], scale=1.0)
+    raw = torch.nn.functional.linear(h_q.detach().to(w_rows.dtype), w_rows[[0, 2, 4]])
+    expected = (torch.tanh(raw / 30.0) * 30.0).float()
+    assert float(torch.max(torch.abs(logits - expected)).item()) < 1e-6
+    (-torch.log(probs[0] + 1e-8)).backward()
+    assert h_q.grad is not None and torch.isfinite(h_q.grad).all()
+
+    # Verify load_codebook_lm_head allows tied gemma4 embed_tokens and extracts softcapping
+    tok = _build_chat_test_tokenizer()
+    chat_builder = ChatDecisionPromptBuilder(tok, max_k=8)
+    full_w = torch.randn(len(tok), 16, dtype=torch.bfloat16)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_file({"model.language_model.embed_tokens.weight": full_w}, os.path.join(tmpdir, "model.safetensors"))
+        gemma_cfg = {
+            "model_type": "gemma4",
+            "tie_word_embeddings": True,
+            "text_config": {"model_type": "gemma4_text", "tie_word_embeddings": True, "final_logit_softcapping": 30.0},
+        }
+        with open(os.path.join(tmpdir, "config.json"), "w", encoding="utf-8") as f:
+            json.dump(gemma_cfg, f)
+        loaded = load_codebook_lm_head(tmpdir, chat_builder, device="cpu", dtype=torch.bfloat16)
+        assert loaded is not None
+        assert loaded.final_logit_softcapping == 30.0
+        _, z_cb = compute_lm_letter_logits(h_q.detach(), loaded, [13, 14, 15, 11], scale=1.0)
+        _, z_ref = compute_lm_letter_logits(
+            h_q.detach(), full_w, [13, 14, 15, 11], scale=1.0, final_logit_softcapping=30.0
+        )
+        assert float(torch.max(torch.abs(z_cb - z_ref)).item()) < 1e-6
+
+    # Live Gemma 4 E2B tokenizer round-trip check when locally cached
+    gemma_snap = Path(
+        r"E:\huggingface\hub\models--google--gemma-4-e2b-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7"
+    )
+    if gemma_snap.exists():
+        from transformers import AutoTokenizer
+
+        tok_gemma = AutoTokenizer.from_pretrained(str(gemma_snap), local_files_only=True)
+        assert detect_model_family(tok_gemma) == "gemma4"
+        cb_a = build_gemma4_single_token_labels(tok_gemma, max_k=180)
+        cb_b = build_gemma4_single_token_labels(tok_gemma, max_k=180)
+        assert cb_a == cb_b
+        assert cb_a == [(str(e["label"]), int(e["token_id"])) for e in entries]
+        gb = ChatDecisionPromptBuilder(tok_gemma, max_k=180)
+        assert gb.yes_no_ids == [yes_id, no_id]
+        assert gb.assistant_tail == "<turn|>\n<|turn>model\n"
+        packed = gb.pack_question(
+            state="Policy: allow refunds within 30 days.",
+            q_id="q1",
+            question=ChoiceQuestion(instructions="Choose outcome", criteria={"allow": "Allow refund", "deny": "Deny"}),
+        )
+        assert packed.label_token_ids["q1"] == [entries[0]["token_id"], entries[1]["token_id"]]
+
+
+def test_gemma4_from_backbone_preserves_fp32_inv_freq_and_heads() -> None:
+    from types import SimpleNamespace
+
+    class _DummyRotary(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False)
+            self.register_buffer("sliding_attention_inv_freq", torch.tensor([1.0, 0.25], dtype=torch.float32), persistent=False)
+
+    class _DummyGemmaBackbone(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(
+                model_type="gemma4",
+                text_config=SimpleNamespace(model_type="gemma4_text", hidden_size=16, max_position_embeddings=256),
+            )
+            self.language_model = torch.nn.Linear(16, 16)
+            self.rotary_emb = _DummyRotary()
+
+    bb = _DummyGemmaBackbone()
+    co = ClassOneModel.from_backbone(bb, device="cpu", torch_dtype=torch.bfloat16)
+    assert co.backbone.language_model.weight.dtype == torch.bfloat16
+    assert co.backbone.rotary_emb.full_attention_inv_freq.dtype == torch.float32
+    assert co.backbone.rotary_emb.sliding_attention_inv_freq.dtype == torch.float32
+    assert next(co.noul_head.parameters()).dtype == torch.float32
+    assert next(co.choice_head.parameters()).dtype == torch.float32
+    assert next(co.score_head.parameters()).dtype == torch.float32
+
+    # Stripped standalone Gemma4TextModel (model_type='gemma4_text') checks
+    from classone.stage2_readout import _extract_final_logit_softcapping
+
+    class _DummyGemmaTextBackbone(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(
+                model_type="gemma4_text",
+                hidden_size=16,
+                max_position_embeddings=256,
+                final_logit_softcapping=30.0,
+            )
+            self.embed_tokens = torch.nn.Embedding(32, 16)
+            self.rotary_emb = _DummyRotary()
+
+    text_bb = _DummyGemmaTextBackbone()
+    assert detect_model_family(text_bb) == "gemma4"
+    assert _extract_final_logit_softcapping(text_bb.config) == 30.0
+    co_text = ClassOneModel.from_backbone(text_bb, device="cpu", torch_dtype=torch.bfloat16)
+    assert co_text.backbone.embed_tokens.weight.dtype == torch.bfloat16
+    assert co_text.backbone.rotary_emb.full_attention_inv_freq.dtype == torch.float32
+    assert next(co_text.noul_head.parameters()).dtype == torch.float32
+
+    # Custom codebook_path forwarding in ChatDecisionPromptBuilder
+    from tokenizers import Tokenizer
+    from tokenizers.models import WordLevel
+    from tokenizers.pre_tokenizers import Whitespace
+    from transformers import PreTrainedTokenizerFast
+
+    vocab = {"<unk>": 0, "Yes": 1, "No": 2, "Z": 3, "Q": 4, "user": 5, "assistant": 6}
+    tk = Tokenizer(WordLevel(vocab=vocab, unk_token="<unk>"))
+    tk.pre_tokenizer = Whitespace()
+    fast_tok = PreTrainedTokenizerFast(tokenizer_object=tk, unk_token="<unk>")
+    fast_tok.chat_template = (
+        "{% for m in messages %}<|turn>{{ m['role'] }}\n{{ m['content'] }}"
+        "{% if loop.last and add_generation_prompt %}<turn|>\n<|turn>model\n{% else %}<turn|>\n{% endif %}{% endfor %}"
+    )
+    assert detect_model_family(fast_tok) == "gemma4"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cb_file = os.path.join(tmpdir, "custom_cb.json")
+        with open(cb_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "entries": [
+                        {"label": "Z", "token_id": 3},
+                        {"label": "Q", "token_id": 4},
+                    ]
+                },
+                f,
+            )
+        cb_builder = ChatDecisionPromptBuilder(fast_tok, max_k=2, codebook_path=cb_file)
+        assert cb_builder.codebook == [("Z", 3), ("Q", 4)]
+        assert cb_builder.yes_no_ids == [1, 2]
