@@ -616,3 +616,97 @@ def test_gemma4_from_backbone_preserves_fp32_inv_freq_and_heads() -> None:
         cb_builder = ChatDecisionPromptBuilder(fast_tok, max_k=2, codebook_path=cb_file)
         assert cb_builder.codebook == [("Z", 3), ("Q", 4)]
         assert cb_builder.yes_no_ids == [1, 2]
+
+
+def test_gemma4_model_parallel_userdict_kv_sharing_and_fp32_inv_freq() -> None:
+    from collections import UserDict
+    from types import SimpleNamespace
+
+    dev0 = "cuda:0" if torch.cuda.device_count() >= 2 else "cpu"
+    dev1 = "cuda:1" if torch.cuda.device_count() >= 2 else "cpu"
+
+    class _DummyRotary(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False)
+
+    class _DummyGemmaLayer(torch.nn.Module):
+        def __init__(self, idx: int, hidden_size: int) -> None:
+            super().__init__()
+            self.idx = idx
+            self.proj = torch.nn.Linear(hidden_size, hidden_size)
+
+        def forward(self, x: torch.Tensor, shared_kv_states=None, **kwargs) -> torch.Tensor:
+            if shared_kv_states is not None:
+                if self.idx == 0:
+                    shared_kv_states["kv_0"] = torch.ones(1, device=x.device, dtype=x.dtype)
+                elif self.idx >= 2 and "kv_0" in shared_kv_states:
+                    assert shared_kv_states["kv_0"].device == x.device
+            return x + 0.1 * torch.tanh(self.proj(x))
+
+    class _DummyGemmaLanguageModel(torch.nn.Module):
+        def __init__(self, vocab_size: int = 32, hidden_size: int = 16) -> None:
+            super().__init__()
+            self.embed_tokens = torch.nn.Embedding(vocab_size, hidden_size)
+            self.rotary_emb = _DummyRotary()
+            self.layers = torch.nn.ModuleList([_DummyGemmaLayer(i, hidden_size) for i in range(4)])
+            self.norm = torch.nn.LayerNorm(hidden_size)
+
+        def get_input_embeddings(self):
+            return self.embed_tokens
+
+        def forward(self, input_ids, attention_mask=None, **kwargs):
+            h = self.embed_tokens(input_ids)
+            shared_kv = UserDict()
+            shared_id = id(shared_kv)
+            for layer in self.layers:
+                h = layer(h, shared_kv_states=shared_kv, attention_mask=attention_mask)
+            assert id(shared_kv) == shared_id
+            return (self.norm(h),)
+
+    class _DummyGemmaComposite(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(
+                model_type="gemma4",
+                text_config=SimpleNamespace(model_type="gemma4_text", hidden_size=16, max_position_embeddings=256),
+            )
+            self.language_model = _DummyGemmaLanguageModel()
+            self.vision_tower = torch.nn.Linear(4, 4)
+            self.audio_tower = torch.nn.Linear(4, 4)
+            self.embed_vision = torch.nn.Linear(4, 4)
+            self.embed_audio = torch.nn.Linear(4, 4)
+
+        def get_input_embeddings(self):
+            return self.language_model.embed_tokens
+
+        def forward(self, input_ids, attention_mask=None, **kwargs):
+            return self.language_model(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+
+    bb = _DummyGemmaComposite()
+    co = ClassOneModel.from_backbone(
+        bb,
+        torch_dtype=torch.bfloat16,
+        model_parallel=True,
+        mp_devices=(dev0, dev1),
+        mp_split_layer=1,
+        head_dtype=torch.float32,
+    )
+    assert co.backbone.vision_tower is None
+    assert co.backbone.audio_tower is None
+    assert co.backbone.language_model.rotary_emb.full_attention_inv_freq.dtype == torch.float32
+    assert next(co.backbone.language_model.layers[0].parameters()).device == torch.device(dev0)
+    assert next(co.backbone.language_model.layers[1].parameters()).device == torch.device(dev1)
+    assert next(co.noul_head.parameters()).device == torch.device(dev1)
+
+    co.train()
+    inp = torch.tensor([[1, 2, 3]], dtype=torch.long)
+    mask = torch.ones_like(inp)
+    hs = co.extract_hidden_states(inp, mask)
+    assert hs.device == torch.device(dev1)
+    prob, _ = co.noul_head(hs[0, -1], return_logits=True)
+    prob.backward()
+    g0 = co.backbone.language_model.layers[0].proj.weight.grad
+    g3 = co.backbone.language_model.layers[3].proj.weight.grad
+    assert g0 is not None and torch.isfinite(g0).all() and float(g0.abs().sum()) > 0
+    assert g3 is not None and torch.isfinite(g3).all() and float(g3.abs().sum()) > 0

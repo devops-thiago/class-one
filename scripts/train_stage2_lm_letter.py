@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -439,6 +439,7 @@ def run_stage2_worker(
             torch_dtype=torch.bfloat16,
             model_parallel=True,
             mp_devices=("cuda:0", "cuda:1"),
+            mp_split_layer=args.mp_split_layer,
             head_dtype=torch.float32,
         )
     else:
@@ -679,8 +680,8 @@ def run_stage2_worker(
         if step_idx % 20 == 0:
             if is_mp:
                 for dev_i in (input_device, output_device):
-                    with torch.cuda.device(dev_i):
-                        torch.cuda.empty_cache()
+                    torch.cuda.synchronize(dev_i)
+                torch.cuda.empty_cache()
             else:
                 torch.cuda.empty_cache()
 
@@ -870,6 +871,12 @@ def parse_args() -> argparse.Namespace:
         "--model-parallel",
         action="store_true",
         help="Shard transformer layers 50/50 across cuda:0 and cuda:1 with heads/readout on cuda:1",
+    )
+    parser.add_argument(
+        "--mp-split-layer",
+        type=int,
+        default=None,
+        help="Optional split layer index for --model-parallel (default: len(layers)//2)",
     )
     parser.add_argument(
         "--max-vram-gb",

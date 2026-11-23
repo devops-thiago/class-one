@@ -7,6 +7,7 @@ for parallel single-pass evaluation of Noul, Choice, and Score primitives.
 from __future__ import annotations
 
 import math
+from collections import UserDict
 from typing import Any
 
 import torch
@@ -224,6 +225,11 @@ def _move_tensors_to_device(obj: Any, device: torch.device) -> Any:
         return tuple(_move_tensors_to_device(x, device) for x in obj)
     if isinstance(obj, list):
         return [_move_tensors_to_device(x, device) for x in obj]
+    if isinstance(obj, UserDict):
+        # Preserve shared UserDict identity (e.g. Gemma 4 shared_kv_states across KV-shared layers)
+        for k in list(obj.keys()):
+            obj[k] = _move_tensors_to_device(obj[k], device)
+        return obj
     if isinstance(obj, dict):
         return {k: _move_tensors_to_device(v, device) for k, v in obj.items()}
     return obj
@@ -316,9 +322,13 @@ class ClassOneModel(PreTrainedModel):
             h.remove()
         self._mp_hook_handles.clear()
 
-        if hasattr(self.backbone, "visual"):
-            del self.backbone.visual
-            self.backbone.visual = None
+        for attr in ("visual", "vision_tower", "audio_tower", "embed_vision", "embed_audio"):
+            if getattr(self.backbone, attr, None) is not None:
+                try:
+                    delattr(self.backbone, attr)
+                except Exception:
+                    pass
+                setattr(self.backbone, attr, None)
 
         text_model = _resolve_text_backbone(self.backbone)
         layers = getattr(text_model, "layers", None)
