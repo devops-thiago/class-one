@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 
+import pytest
 import torch
 from fastapi.testclient import TestClient
 from tokenizers import Tokenizer
@@ -512,27 +513,33 @@ def test_gemma4_codebook_v1_determinism_and_softcap_readout() -> None:
         assert float(torch.max(torch.abs(z_cb - z_ref)).item()) < 1e-6
 
     # Live Gemma 4 E2B tokenizer round-trip check when locally cached
-    gemma_snap = Path(
-        r"E:\huggingface\hub\models--google--gemma-4-e2b-it\snapshots\3e22461f65e89153144f8adb70e3b8c2cc9845a7"
-    )
-    if gemma_snap.exists():
-        from transformers import AutoTokenizer
+    from huggingface_hub import try_to_load_from_cache
 
-        tok_gemma = AutoTokenizer.from_pretrained(str(gemma_snap), local_files_only=True)
-        assert detect_model_family(tok_gemma) == "gemma4"
-        cb_a = build_gemma4_single_token_labels(tok_gemma, max_k=180)
-        cb_b = build_gemma4_single_token_labels(tok_gemma, max_k=180)
-        assert cb_a == cb_b
-        assert cb_a == [(str(e["label"]), int(e["token_id"])) for e in entries]
-        gb = ChatDecisionPromptBuilder(tok_gemma, max_k=180)
-        assert gb.yes_no_ids == [yes_id, no_id]
-        assert gb.assistant_tail == "<turn|>\n<|turn>model\n"
-        packed = gb.pack_question(
-            state="Policy: allow refunds within 30 days.",
-            q_id="q1",
-            question=ChoiceQuestion(instructions="Choose outcome", criteria={"allow": "Allow refund", "deny": "Deny"}),
-        )
-        assert packed.label_token_ids["q1"] == [entries[0]["token_id"], entries[1]["token_id"]]
+    cached_tok = try_to_load_from_cache(
+        "google/gemma-4-e2b-it",
+        "tokenizer.json",
+        revision="3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+    )
+    if not isinstance(cached_tok, str):
+        pytest.skip("google/gemma-4-e2b-it tokenizer.json not found in local HF cache")
+    gemma_snap = Path(cached_tok).parent
+    from transformers import AutoTokenizer
+
+    tok_gemma = AutoTokenizer.from_pretrained(str(gemma_snap), local_files_only=True)
+    assert detect_model_family(tok_gemma) == "gemma4"
+    cb_a = build_gemma4_single_token_labels(tok_gemma, max_k=180)
+    cb_b = build_gemma4_single_token_labels(tok_gemma, max_k=180)
+    assert cb_a == cb_b
+    assert cb_a == [(str(e["label"]), int(e["token_id"])) for e in entries]
+    gb = ChatDecisionPromptBuilder(tok_gemma, max_k=180)
+    assert gb.yes_no_ids == [yes_id, no_id]
+    assert gb.assistant_tail == "<turn|>\n<|turn>model\n"
+    packed = gb.pack_question(
+        state="Policy: allow refunds within 30 days.",
+        q_id="q1",
+        question=ChoiceQuestion(instructions="Choose outcome", criteria={"allow": "Allow refund", "deny": "Deny"}),
+    )
+    assert packed.label_token_ids["q1"] == [entries[0]["token_id"], entries[1]["token_id"]]
 
 
 def test_gemma4_from_backbone_preserves_fp32_inv_freq_and_heads() -> None:
