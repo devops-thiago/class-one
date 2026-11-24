@@ -21,7 +21,12 @@ from transformers import AutoTokenizer
 from classone.modeling.configuration_classone import ClassOneConfig
 from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import DecisionRequest, DecisionResponse, DecisionUsage
-from classone.stage2_readout import ChatDecisionPromptBuilder, evaluate_stage2_request, load_stage2_snapshot
+from classone.stage2_readout import (
+    ChatDecisionPromptBuilder,
+    evaluate_stage2_request,
+    load_stage2_snapshot,
+    strip_unused_multimodal_towers,
+)
 from classone.tokenizer import ClassOnePromptBuilder
 
 logger = logging.getLogger(__name__)
@@ -104,6 +109,29 @@ def get_max_tokens_per_request(model: Any | None = None) -> int | None:
         )
         _warned_uncapped = True
     return limit
+
+
+def _resolve_codebook_path(
+    model_name: str,
+    cfg: Mapping[str, Any],
+    revision: str | None,
+    offline_only: bool,
+) -> str | None:
+    """Resolves a bundled codebook_file from a local standalone dir or Hub repo."""
+    cb_file = str(cfg.get("codebook_file") or "").strip() if isinstance(cfg, Mapping) else ""
+    if not cb_file:
+        return None
+    if os.path.isdir(model_name):
+        cand = pathlib.Path(model_name) / cb_file
+        return str(cand) if cand.exists() else None
+    if "/" in model_name:
+        try:
+            from huggingface_hub import hf_hub_download
+
+            return hf_hub_download(model_name, cb_file, revision=revision, local_files_only=offline_only)
+        except Exception:
+            return None
+    return None
 
 
 def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
@@ -193,11 +221,12 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                     if revision and not os.path.isdir(tok_path):
                         tok_kwargs["revision"] = revision
                     _tokenizer = AutoTokenizer.from_pretrained(tok_path, **tok_kwargs)
+                    cb_path = _resolve_codebook_path(model_name, disk_cfg, revision, offline_only)
                     if is_stage2_cfg:
-                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
+                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer), codebook_path=cb_path)
                     elif getattr(_tokenizer, "chat_template", None):
                         try:
-                            _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
+                            _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer), codebook_path=cb_path)
                         except Exception:
                             _chat_builder = None
 
@@ -244,21 +273,22 @@ def get_pipeline() -> tuple[ClassOneModel, ClassOnePromptBuilder]:
                             _model.score_head.to(dtype=torch.float32)
 
                     backbone_cfg = getattr(getattr(_model, "backbone", None), "config", None)
-                    stage2_active = is_stage2_cfg or (
-                        (
-                            getattr(backbone_cfg, "classone_config", None)
-                            or getattr(getattr(_model, "config", None), "classone_config", None)
-                            or {}
-                        ).get("eval_mode")
-                        == "stage2"
+                    runtime_cls_cfg = (
+                        getattr(backbone_cfg, "classone_config", None)
+                        or getattr(getattr(_model, "config", None), "classone_config", None)
+                        or {}
                     )
+                    stage2_active = is_stage2_cfg or (runtime_cls_cfg.get("eval_mode") == "stage2")
                     if stage2_active and _chat_builder is None:
-                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer))
-                    if stage2_active and hasattr(getattr(_model, "backbone", None), "visual"):
-                        del _model.backbone.visual
-                        _model.backbone.visual = None
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
+                        cb_path = _resolve_codebook_path(
+                            model_name,
+                            disk_cfg or runtime_cls_cfg,
+                            revision,
+                            offline_only,
+                        )
+                        _chat_builder = ChatDecisionPromptBuilder(copy.deepcopy(_tokenizer), codebook_path=cb_path)
+                    if stage2_active and getattr(_model, "backbone", None) is not None:
+                        strip_unused_multimodal_towers(_model.backbone, clear_cuda_cache=torch.cuda.is_available())
 
                     _prompt_builder = ClassOnePromptBuilder(_tokenizer)
 

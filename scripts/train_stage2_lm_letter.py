@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -33,7 +33,12 @@ from transformers import AutoTokenizer
 from classone.modeling.loss import RLCDLoss
 from classone.modeling.modeling_classone import ClassOneModel
 from classone.schemas import ChoiceQuestion, NoulQuestion, ScoreQuestion
-from classone.stage2_readout import ChatDecisionPromptBuilder, compute_lm_letter_logits
+from classone.stage2_readout import (
+    ChatDecisionPromptBuilder,
+    compute_lm_letter_logits,
+    load_codebook_lm_head,
+    strip_unused_multimodal_towers,
+)
 from classone.tokenizer import ClassOnePromptBuilder
 from classone.train.trainer import ClassOneTrainer
 
@@ -179,13 +184,15 @@ def _compute_unit_losses(
     lm_scale: float,
     aux_head_weight: float,
     kl_weight: float = 0.0,
+    input_device: torch.device | None = None,
 ) -> tuple[torch.Tensor | None, float, float]:
-    input_ids = packed.input_ids.to(device)
-    attention_mask = packed.attention_mask.to(device)
+    in_dev = input_device or device
+    input_ids = packed.input_ids.to(in_dev)
+    attention_mask = packed.attention_mask.to(in_dev)
 
     has_opts = any(len(getattr(sp, "option_token_spans", [])) > 1 for sp in packed.questions.values())
     if use_pos_inv and has_opts:
-        mask_4d, pos_ids = model.build_position_invariant_mask(packed, device, dtype=torch.bfloat16)
+        mask_4d, pos_ids = model.build_position_invariant_mask(packed, in_dev, dtype=torch.bfloat16)
         hidden_states = model.extract_hidden_states(input_ids=input_ids, attention_mask=mask_4d, position_ids=pos_ids)
     else:
         hidden_states = model.extract_hidden_states(input_ids=input_ids, attention_mask=attention_mask)
@@ -338,9 +345,11 @@ def _eval_mcq5_and_oos(
     oos_rows: list[dict],
     device: torch.device,
     lm_scale: float,
+    input_device: torch.device | None = None,
 ) -> dict:
     """Evaluates Held-Out-1K single_q_knowledge_mcq5 (120) and Out-of-Source-320 (320) on rank 0."""
     model.eval()
+    in_dev = input_device or device
     t0 = time.perf_counter()
 
     def _run_set(rows: list[dict]) -> tuple[float, dict[str, float]]:
@@ -360,7 +369,7 @@ def _eval_mcq5_and_oos(
                         state=chat_builder.serialize_state(r["state"])[:8000], q_id=qid, question=q_obj
                     )
                 with torch.no_grad():
-                    hs = model.extract_hidden_states(packed.input_ids.to(device), packed.attention_mask.to(device))
+                    hs = model.extract_hidden_states(packed.input_ids.to(in_dev), packed.attention_mask.to(in_dev))
                     span = packed.questions[qid]
                     _, logits_lm = compute_lm_letter_logits(
                         hs[0][span.query_token_idx], embed_weight, packed.label_token_ids[qid], scale=lm_scale
@@ -392,38 +401,84 @@ def run_stage2_worker(
     q_in=None,
     ctrl_q=None,
 ):
-    """Executes Stage 2 training (Arm A or Arm B) on a single GPU worker."""
+    """Executes Stage 2 training (Arm A or Arm B) on a single GPU worker or 2-GPU model parallel."""
     os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-    device = torch.device(f"cuda:{rank}")
-    torch.cuda.set_device(device)
-    torch.cuda.reset_peak_memory_stats(device)
+    is_mp = bool(getattr(args, "model_parallel", False))
+    if is_mp:
+        if torch.cuda.device_count() < 2:
+            raise RuntimeError(f"--model-parallel requires >= 2 CUDA devices, found {torch.cuda.device_count()}")
+        input_device = torch.device("cuda:0")
+        output_device = torch.device("cuda:1")
+        device = output_device
+        torch.cuda.set_device(input_device)
+        torch.cuda.reset_peak_memory_stats(input_device)
+        torch.cuda.reset_peak_memory_stats(output_device)
+    else:
+        device = torch.device(f"cuda:{rank}")
+        input_device = device
+        output_device = device
+        torch.cuda.set_device(device)
+        torch.cuda.reset_peak_memory_stats(device)
 
     if rank == 0:
+        mp_note = " | model_parallel=cuda:0->cuda:1" if is_mp else ""
         print(
-            f"[Stage2 Arm {args.arm} | Rank {rank}] Loading {args.base_model} "
+            f"[Stage2 Arm {args.arm} | Rank {rank}{mp_note}] Loading {args.base_model} "
             f"(LoRA r={args.lora_r}, alpha={args.lora_alpha}, lm_scale={args.lm_scale})...",
             flush=True,
         )
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, trust_remote_code=True, local_files_only=True)
-    co_builder = ClassOnePromptBuilder(tokenizer)
     chat_builder = ChatDecisionPromptBuilder(tokenizer) if args.arm.upper() == "A" else None
+    co_builder = ClassOnePromptBuilder(tokenizer)
 
-    model = ClassOneModel.from_backbone(
-        args.base_model,
-        tokenizer=tokenizer,
-        device=str(device),
-        torch_dtype=torch.bfloat16,
-    )
+    if is_mp:
+        model = ClassOneModel.from_backbone(
+            args.base_model,
+            tokenizer=tokenizer,
+            torch_dtype=torch.bfloat16,
+            model_parallel=True,
+            mp_devices=("cuda:0", "cuda:1"),
+            mp_split_layer=args.mp_split_layer,
+            head_dtype=torch.float32,
+        )
+    else:
+        model = ClassOneModel.from_backbone(
+            args.base_model,
+            tokenizer=tokenizer,
+            device=str(device),
+            torch_dtype=torch.bfloat16,
+        )
 
     heads_path = args.pretrained_heads or os.path.join(args.base_model, "classone_heads.pt")
     if os.path.exists(heads_path):
-        load_heads_matching_shapes(model, heads_path, device, rank)
+        load_heads_matching_shapes(model, heads_path, output_device, rank)
 
-    if hasattr(model.backbone, "visual"):
-        del model.backbone.visual
-        model.backbone.visual = None
-        torch.cuda.empty_cache()
+    if chat_builder is not None:
+        codebook_head = load_codebook_lm_head(
+            args.base_model,
+            chat_builder,
+            device=output_device,
+            dtype=torch.bfloat16,
+            include_yes_no=True,
+        )
+        if codebook_head is not None:
+            model.lm_readout_head = codebook_head
+            if rank == 0:
+                print(
+                    f"[Stage2 Arm {args.arm}] Loaded frozen CodebookLMHead slice "
+                    f"{tuple(codebook_head.weight.shape)} on {output_device}"
+                    + (
+                        f" (softcap={codebook_head.final_logit_softcapping})"
+                        if codebook_head.final_logit_softcapping is not None
+                        else ""
+                    ),
+                    flush=True,
+                )
+
+    stripped_towers = strip_unused_multimodal_towers(model.backbone, clear_cuda_cache=True)
+    if stripped_towers and rank == 0:
+        print(f"[Stage2 Arm {args.arm}] Stripped unused multimodal towers: {stripped_towers}", flush=True)
 
     if hasattr(model.backbone, "gradient_checkpointing_enable"):
         model.backbone.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
@@ -449,10 +504,21 @@ def run_stage2_worker(
         loss_fn=loss_fn_heads,
         lr=args.lr,
         weight_decay=0.01,
-        device=device,
+        device=output_device,
     )
     if args.resume_lora and os.path.exists(args.resume_lora):
         model.backbone = PeftModel.from_pretrained(model.backbone, args.resume_lora, is_trainable=True)
+        if is_mp:
+            for mod in model.backbone.modules():
+                base_layer = getattr(mod, "base_layer", None)
+                base_w = getattr(base_layer, "weight", None)
+                if base_w is None:
+                    continue
+                target_dev = base_w.device
+                for attr in ("lora_A", "lora_B", "lora_embedding_A", "lora_embedding_B", "lora_magnitude_vector"):
+                    sub = getattr(mod, attr, None)
+                    if isinstance(sub, torch.nn.Module):
+                        sub.to(device=target_dev)
         for head in (model.noul_head, model.choice_head, model.score_head):
             for p in head.parameters():
                 p.requires_grad = True
@@ -466,6 +532,14 @@ def run_stage2_worker(
             )
     else:
         trainer.enable_lora(r=args.lora_r, lora_alpha=args.lora_alpha, lora_dropout=0.05)
+
+    if is_mp:
+        assert all(p.device.type == "cuda" for p in model.parameters() if p.requires_grad), (
+            "Model-parallel mode requires all trainable parameters on CUDA devices"
+        )
+
+    if hasattr(model.backbone, "enable_input_require_grads"):
+        model.backbone.enable_input_require_grads()
 
     mcq5_rows: list[dict] = []
     oos_rows: list[dict] = []
@@ -499,7 +573,11 @@ def run_stage2_worker(
     trainer.setup_scheduler(total_steps=total_steps, warmup_steps=max(5, min(100, total_steps // 12)))
 
     ordered_letters, tok_map = build_label_token_map(tokenizer)
-    embed_weight = model.backbone.get_input_embeddings().weight
+    embed_weight = (
+        model.lm_readout_head
+        if getattr(model, "lm_readout_head", None) is not None
+        else model.backbone.get_input_embeddings().weight
+    )
 
     step_logs = []
     eval_history = []
@@ -534,7 +612,7 @@ def run_stage2_worker(
                 tgts_or_single=tgts_or_single,
                 use_pos_inv=use_pos_inv,
                 explicit_label_ids=explicit_label_ids,
-                device=device,
+                device=output_device,
                 tokenizer=tokenizer,
                 ordered_letters=ordered_letters,
                 tok_map=tok_map,
@@ -544,6 +622,7 @@ def run_stage2_worker(
                 lm_scale=args.lm_scale,
                 aux_head_weight=args.aux_head_weight,
                 kl_weight=args.kl_weight,
+                input_device=input_device,
             )
             if item_loss is not None:
                 scaled = item_loss / total_valid_q
@@ -552,6 +631,60 @@ def run_stage2_worker(
                 step_lm_loss += item_lm_val / total_valid_q
                 step_head_loss += item_hd_val / total_valid_q
                 del item_loss
+
+        if step_idx == 1:
+            if is_mp:
+                g0_nz = sum(
+                    1
+                    for p in model.parameters()
+                    if p.requires_grad
+                    and p.device == input_device
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
+                )
+                g1_nz = sum(
+                    1
+                    for p in model.parameters()
+                    if p.requires_grad
+                    and p.device == output_device
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
+                )
+                if g0_nz == 0 or g1_nz == 0:
+                    raise RuntimeError(
+                        f"Model-parallel gradient check failed at step 1: {input_device}={g0_nz}, {output_device}={g1_nz}"
+                    )
+                print(
+                    f"[MP Step 1 Grads Verified] {input_device}_nonzero={g0_nz}, {output_device}_nonzero={g1_nz}",
+                    flush=True,
+                )
+            else:
+                lora_nz = sum(
+                    1
+                    for n, p in model.named_parameters()
+                    if "lora_" in n
+                    and p.requires_grad
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
+                )
+                head_nz = sum(
+                    1
+                    for n, p in model.named_parameters()
+                    if any(h in n for h in ("noul_head.", "choice_head.", "score_head."))
+                    and p.requires_grad
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
+                )
+                if lora_nz == 0 or head_nz == 0:
+                    raise RuntimeError(
+                        f"Step 1 gradient check failed on rank {rank}: lora_nonzero={lora_nz}, head_nonzero={head_nz}"
+                    )
+                if rank == 0:
+                    print(f"[Step 1 Grads Verified] lora_nonzero={lora_nz}, head_nonzero={head_nz}", flush=True)
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         if world_size > 1 and q_out is not None and q_in is not None:
@@ -562,36 +695,92 @@ def run_stage2_worker(
         trainer.optimizer.zero_grad(set_to_none=True)
 
         if step_idx % 20 == 0:
-            torch.cuda.empty_cache()
+            if is_mp:
+                for dev_i in (input_device, output_device):
+                    torch.cuda.synchronize(dev_i)
+                torch.cuda.empty_cache()
+            else:
+                torch.cuda.empty_cache()
 
         step_sec = time.perf_counter() - t_step
-        alloc_gb = torch.cuda.memory_allocated(device) / 1e9
-        max_alloc_gb = torch.cuda.max_memory_allocated(device) / 1e9
-        res_gb = torch.cuda.memory_reserved(device) / 1e9
-
-        rec = {
-            "step": step_idx,
-            "epoch": epoch_idx + 1,
-            "step_sec": round(step_sec, 3),
-            "total_loss": round(step_total_loss, 4),
-            "lm_letter_loss": round(step_lm_loss, 4),
-            "aux_head_loss": round(step_head_loss, 4),
-            "alloc_gb": round(alloc_gb, 3),
-            "max_alloc_gb": round(max_alloc_gb, 3),
-            "reserved_gb": round(res_gb, 3),
-            "avg_seq_tokens": round(statistics.mean(seq_lens), 1),
-        }
+        if is_mp:
+            g0_alloc = torch.cuda.memory_allocated(input_device) / 1e9
+            g0_max_alloc = torch.cuda.max_memory_allocated(input_device) / 1e9
+            g0_res = torch.cuda.memory_reserved(input_device) / 1e9
+            g0_max_res = torch.cuda.max_memory_reserved(input_device) / 1e9
+            g1_alloc = torch.cuda.memory_allocated(output_device) / 1e9
+            g1_max_alloc = torch.cuda.max_memory_allocated(output_device) / 1e9
+            g1_res = torch.cuda.memory_reserved(output_device) / 1e9
+            g1_max_res = torch.cuda.max_memory_reserved(output_device) / 1e9
+            alloc_gb = max(g0_alloc, g1_alloc)
+            max_alloc_gb = max(g0_max_alloc, g1_max_alloc)
+            res_gb = max(g0_max_res, g1_max_res)
+            rec = {
+                "step": step_idx,
+                "epoch": epoch_idx + 1,
+                "step_sec": round(step_sec, 3),
+                "total_loss": round(step_total_loss, 4),
+                "lm_letter_loss": round(step_lm_loss, 4),
+                "aux_head_loss": round(step_head_loss, 4),
+                "alloc_gb": round(alloc_gb, 3),
+                "max_alloc_gb": round(max_alloc_gb, 3),
+                "reserved_gb": round(res_gb, 3),
+                "gpu0_alloc_gb": round(g0_alloc, 3),
+                "gpu0_max_alloc_gb": round(g0_max_alloc, 3),
+                "gpu0_reserved_gb": round(g0_res, 3),
+                "gpu0_max_reserved_gb": round(g0_max_res, 3),
+                "gpu1_alloc_gb": round(g1_alloc, 3),
+                "gpu1_max_alloc_gb": round(g1_max_alloc, 3),
+                "gpu1_reserved_gb": round(g1_res, 3),
+                "gpu1_max_reserved_gb": round(g1_max_res, 3),
+                "avg_seq_tokens": round(statistics.mean(seq_lens), 1),
+            }
+        else:
+            alloc_gb = torch.cuda.memory_allocated(device) / 1e9
+            max_alloc_gb = torch.cuda.max_memory_allocated(device) / 1e9
+            res_gb = torch.cuda.memory_reserved(device) / 1e9
+            rec = {
+                "step": step_idx,
+                "epoch": epoch_idx + 1,
+                "step_sec": round(step_sec, 3),
+                "total_loss": round(step_total_loss, 4),
+                "lm_letter_loss": round(step_lm_loss, 4),
+                "aux_head_loss": round(step_head_loss, 4),
+                "alloc_gb": round(alloc_gb, 3),
+                "max_alloc_gb": round(max_alloc_gb, 3),
+                "reserved_gb": round(res_gb, 3),
+                "avg_seq_tokens": round(statistics.mean(seq_lens), 1),
+            }
         step_logs.append(rec)
 
         log_every = 5 if args.max_steps and args.max_steps <= 100 else 25
         if rank == 0 and (step_idx == 1 or step_idx % log_every == 0 or step_idx == total_steps):
             elapsed = time.perf_counter() - t_start
+            if is_mp:
+                vram_msg = (
+                    f"VRAM peak=({rec['gpu0_max_alloc_gb']:.2f}, {rec['gpu1_max_alloc_gb']:.2f})GB "
+                    f"res=({rec['gpu0_max_reserved_gb']:.2f}, {rec['gpu1_max_reserved_gb']:.2f})GB"
+                )
+            else:
+                vram_msg = f"VRAM peak={max_alloc_gb:.2f}GB res={res_gb:.2f}GB"
             print(
                 f"[Arm {args.arm} Step {step_idx:4d}/{total_steps}] {step_sec:.2f}s/step (avg {elapsed / step_idx:.2f}s) | "
                 f"loss={step_total_loss:.4f} (lm={step_lm_loss:.4f}, head={step_head_loss:.4f}) | "
-                f"VRAM peak={max_alloc_gb:.2f}GB res={res_gb:.2f}GB | tok={rec['avg_seq_tokens']}",
+                f"{vram_msg} | tok={rec['avg_seq_tokens']}",
                 flush=True,
             )
+
+        if args.max_vram_gb is not None:
+            peak_check = max(rec.get("gpu0_max_alloc_gb", max_alloc_gb), rec.get("gpu1_max_alloc_gb", max_alloc_gb))
+            if peak_check > args.max_vram_gb:
+                if args.output_dir:
+                    os.makedirs(args.output_dir, exist_ok=True)
+                    Path(args.output_dir, f"telemetry_rank{rank}.json").write_text(
+                        json.dumps(step_logs, indent=2), encoding="utf-8"
+                    )
+                raise RuntimeError(
+                    f"VRAM ceiling exceeded at step {step_idx}: peak allocated {peak_check:.3f}GB > {args.max_vram_gb}GB"
+                )
 
         # Save intermediate epoch checkpoints for full runs
         if rank == 0 and args.output_dir and args.max_steps is None and (step_idx % steps_per_epoch == 0):
@@ -609,8 +798,9 @@ def run_stage2_worker(
                     embed_weight=embed_weight,
                     mcq5_rows=mcq5_rows,
                     oos_rows=oos_rows,
-                    device=device,
+                    device=output_device,
                     lm_scale=args.lm_scale,
+                    input_device=input_device,
                 )
                 ev["step"] = step_idx
                 eval_history.append(ev)
@@ -694,6 +884,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--oos-baseline-acc", type=float, default=83.12, help="Arm A OOS-320 baseline for early stopping"
     )
+    parser.add_argument(
+        "--model-parallel",
+        action="store_true",
+        help="Shard transformer layers 50/50 across cuda:0 and cuda:1 with heads/readout on cuda:1",
+    )
+    parser.add_argument(
+        "--mp-split-layer",
+        type=int,
+        default=None,
+        help="Optional split layer index for --model-parallel (default: len(layers)//2)",
+    )
+    parser.add_argument(
+        "--max-vram-gb",
+        type=float,
+        default=None,
+        help="Optional per-GPU peak allocated VRAM safety limit in GB",
+    )
     return parser.parse_args()
 
 
@@ -732,15 +939,25 @@ def summarize_telemetry(out_dir: str, arm: str, world_size: int) -> dict:
                 "avg_step_sec": round(statistics.mean(x["step_sec"] for x in c0), 3),
             }
         )
+    is_mp_logs = bool(logs0 and "gpu0_max_alloc_gb" in logs0[-1])
     summary = {
         "arm": arm,
+        "model_parallel": is_mp_logs,
         "steps_completed": len(logs0),
         "steady_mean_sec_per_step": round(statistics.mean(steady), 3),
         "steady_median_sec_per_step": round(statistics.median(steady), 3),
-        "gpu0_peak_allocated_gb": max(x["max_alloc_gb"] for x in logs0),
-        "gpu0_peak_reserved_gb": max(x["reserved_gb"] for x in logs0),
-        "gpu1_peak_allocated_gb": max(x["max_alloc_gb"] for x in logs1),
-        "gpu1_peak_reserved_gb": max(x["reserved_gb"] for x in logs1),
+        "gpu0_peak_allocated_gb": max(x["gpu0_max_alloc_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["max_alloc_gb"] for x in logs0),
+        "gpu0_peak_reserved_gb": max(x["gpu0_max_reserved_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["reserved_gb"] for x in logs0),
+        "gpu1_peak_allocated_gb": max(x["gpu1_max_alloc_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["max_alloc_gb"] for x in logs1),
+        "gpu1_peak_reserved_gb": max(x["gpu1_max_reserved_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["reserved_gb"] for x in logs1),
         "loss_buckets": buckets,
     }
     Path(out_dir, "telemetry_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -751,7 +968,7 @@ def summarize_telemetry(out_dir: str, arm: str, world_size: int) -> dict:
 def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
-    if args.gpus <= 1:
+    if args.model_parallel or args.gpus <= 1:
         run_stage2_worker(0, 1, args)
         summarize_telemetry(args.output_dir, args.arm, 1)
         return
