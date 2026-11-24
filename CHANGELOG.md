@@ -2,6 +2,20 @@
 
 All notable changes to `classone` are documented in this file.
 
+## [0.4.0] - 2026-11-24
+
+### Added
+- **Gemma 4 Stage 2 LM-head readout (`classone.stage2_readout`, `classone.modeling`):**
+  - Added versioned Gemma 4 single-token round-trip codebook (`src/classone/codebooks/gemma4_e2b_codebook_v1.json`) and tied embedding slice readout (`CodebookLMHead`) with `final_logit_softcapping` support (`30.0`).
+  - Preserved FP32 RoPE `inv_freq` buffers and FP32 decision heads (`noul_head`, `choice_head`, `score_head`) under BF16 backbone loading, plus unused multimodal tower stripping (`strip_unused_multimodal_towers`).
+  - Added standalone Stage 2 export support for unmodified base weights (`scripts/export_stage2_merged.py --allow-no-lora --strip-multimodal`) used by `devops-thiago/classone-gemma4-e2b` v1.1 (`2ba24ff`, Decision Index 0.3 public `24.64`, `apolinario/decision-index#520`).
+- **2-GPU model-parallel Stage 2 training support (`scripts/train_stage2_lm_letter.py`, `classone.modeling`):**
+  - Added `--model-parallel` / `--mp-split-layer` sharding across 2 GPUs for Qwen 3.5 9B and Gemma 4 E4B, including `UserDict` `shared_kv_states` device migration, `--resume-lora` device guards, and FP32 `inv_freq` preservation. *(Stage 2 candidates for 9B and E4B were rejected by preregistered gates — `REJECT_ALL` / `REJECT_UNSEEN` — leaving published 9B/E4B checkpoints unchanged.)*
+
+### Changed
+- Added light/dark ClassOne logo assets (`assets/classone-logo.png`, `assets/classone-logo-dark.png`) and centered header in `README.md`.
+- Normalized repository line endings to LF via `.gitattributes` and updated live Gemma 4 tokenizer cache lookup in `tests/test_stage2_readout.py` to use `huggingface_hub.try_to_load_from_cache`.
+
 ## [0.3.0] - 2026-11-18
 
 ### Added
