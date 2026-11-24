@@ -637,21 +637,38 @@ def run_stage2_worker(
                 g0_nz = sum(
                     1
                     for p in model.parameters()
-                    if p.requires_grad and p.device == input_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                    if p.requires_grad
+                    and p.device == input_device
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
                 )
                 g1_nz = sum(
                     1
                     for p in model.parameters()
-                    if p.requires_grad and p.device == output_device and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                    if p.requires_grad
+                    and p.device == output_device
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
                 )
                 if g0_nz == 0 or g1_nz == 0:
-                    raise RuntimeError(f"Model-parallel gradient check failed at step 1: {input_device}={g0_nz}, {output_device}={g1_nz}")
-                print(f"[MP Step 1 Grads Verified] {input_device}_nonzero={g0_nz}, {output_device}_nonzero={g1_nz}", flush=True)
+                    raise RuntimeError(
+                        f"Model-parallel gradient check failed at step 1: {input_device}={g0_nz}, {output_device}={g1_nz}"
+                    )
+                print(
+                    f"[MP Step 1 Grads Verified] {input_device}_nonzero={g0_nz}, {output_device}_nonzero={g1_nz}",
+                    flush=True,
+                )
             else:
                 lora_nz = sum(
                     1
                     for n, p in model.named_parameters()
-                    if "lora_" in n and p.requires_grad and p.grad is not None and torch.isfinite(p.grad).all() and p.grad.abs().sum() > 0
+                    if "lora_" in n
+                    and p.requires_grad
+                    and p.grad is not None
+                    and torch.isfinite(p.grad).all()
+                    and p.grad.abs().sum() > 0
                 )
                 head_nz = sum(
                     1
@@ -929,10 +946,18 @@ def summarize_telemetry(out_dir: str, arm: str, world_size: int) -> dict:
         "steps_completed": len(logs0),
         "steady_mean_sec_per_step": round(statistics.mean(steady), 3),
         "steady_median_sec_per_step": round(statistics.median(steady), 3),
-        "gpu0_peak_allocated_gb": max(x["gpu0_max_alloc_gb"] for x in logs0) if is_mp_logs else max(x["max_alloc_gb"] for x in logs0),
-        "gpu0_peak_reserved_gb": max(x["gpu0_max_reserved_gb"] for x in logs0) if is_mp_logs else max(x["reserved_gb"] for x in logs0),
-        "gpu1_peak_allocated_gb": max(x["gpu1_max_alloc_gb"] for x in logs0) if is_mp_logs else max(x["max_alloc_gb"] for x in logs1),
-        "gpu1_peak_reserved_gb": max(x["gpu1_max_reserved_gb"] for x in logs0) if is_mp_logs else max(x["reserved_gb"] for x in logs1),
+        "gpu0_peak_allocated_gb": max(x["gpu0_max_alloc_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["max_alloc_gb"] for x in logs0),
+        "gpu0_peak_reserved_gb": max(x["gpu0_max_reserved_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["reserved_gb"] for x in logs0),
+        "gpu1_peak_allocated_gb": max(x["gpu1_max_alloc_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["max_alloc_gb"] for x in logs1),
+        "gpu1_peak_reserved_gb": max(x["gpu1_max_reserved_gb"] for x in logs0)
+        if is_mp_logs
+        else max(x["reserved_gb"] for x in logs1),
         "loss_buckets": buckets,
     }
     Path(out_dir, "telemetry_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

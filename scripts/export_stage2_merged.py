@@ -61,7 +61,9 @@ def export_standalone_stage2(
 
     local_only = os.path.isdir(base_model) or os.environ.get("HF_HUB_OFFLINE") == "1"
     meta_path = snap_path / "snapshot_metadata.json" if snap_path is not None else None
-    meta: dict = json.loads(meta_path.read_text(encoding="utf-8")) if (meta_path is not None and meta_path.exists()) else {}
+    meta: dict = (
+        json.loads(meta_path.read_text(encoding="utf-8")) if (meta_path is not None and meta_path.exists()) else {}
+    )
     components = meta.get("merge_recipe", {}).get("components", []) or []
 
     print(f"[*] Loading BF16 base backbone from {base_model} on {device}...")
@@ -145,7 +147,9 @@ def export_standalone_stage2(
         codebook_name = cb_src.name
         codebook_sha = cb_dst_sha
 
-    resolved_candidate = candidate_name or meta.get("candidate") or (snap_path.name if snap_path is not None else out_path.name)
+    resolved_candidate = (
+        candidate_name or meta.get("candidate") or (snap_path.name if snap_path is not None else out_path.name)
+    )
     config_file = out_path / "config.json"
     cfg_data = json.loads(config_file.read_text(encoding="utf-8"))
     cls_cfg: dict = {
@@ -190,14 +194,28 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Export Stage 2 merged LoRA + heads as standalone model")
     parser.add_argument("--base-model", required=True, help="Local path or HF model ID of base backbone")
-    parser.add_argument("--snapshot-dir", default=None, help="Stage 2 snapshot directory (optional with --allow-no-lora --heads-path)")
+    parser.add_argument(
+        "--snapshot-dir", default=None, help="Stage 2 snapshot directory (optional with --allow-no-lora --heads-path)"
+    )
     parser.add_argument("--heads-path", default=None, help="Explicit path to classone_heads.pt")
-    parser.add_argument("--expected-heads-sha256", default=None, help="Expected uppercase/lowercase SHA256 for classone_heads.pt")
-    parser.add_argument("--allow-no-lora", action="store_true", help="Export unmodified base weights + Stage 2 readout without LoRA")
-    parser.add_argument("--strip-multimodal", action="store_true", help="Strip unused vision/audio towers before saving")
-    parser.add_argument("--codebook-file", default=None, help="Optional single-token codebook JSON to bundle and register")
-    parser.add_argument("--candidate-name", default=None, help="Optional candidate identifier written into classone_config")
-    parser.add_argument("--base-model-revision", default=None, help="Optional base model revision written into classone_config")
+    parser.add_argument(
+        "--expected-heads-sha256", default=None, help="Expected uppercase/lowercase SHA256 for classone_heads.pt"
+    )
+    parser.add_argument(
+        "--allow-no-lora", action="store_true", help="Export unmodified base weights + Stage 2 readout without LoRA"
+    )
+    parser.add_argument(
+        "--strip-multimodal", action="store_true", help="Strip unused vision/audio towers before saving"
+    )
+    parser.add_argument(
+        "--codebook-file", default=None, help="Optional single-token codebook JSON to bundle and register"
+    )
+    parser.add_argument(
+        "--candidate-name", default=None, help="Optional candidate identifier written into classone_config"
+    )
+    parser.add_argument(
+        "--base-model-revision", default=None, help="Optional base model revision written into classone_config"
+    )
     parser.add_argument("--output-dir", required=True, help="Destination standalone directory")
     parser.add_argument("--m2-k-threshold", type=int, default=64, help="Candidate count threshold for M2 shortlist")
     parser.add_argument("--m2-top-k", type=int, default=16, help="M2 second-pass shortlist size")

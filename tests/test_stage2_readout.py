@@ -319,7 +319,9 @@ def test_codebook_lm_head_parity_and_gradients() -> None:
     vocab_size, hidden_size = len(tok), 64
     full_w = torch.randn(vocab_size, hidden_size, dtype=torch.bfloat16)
 
-    ids = [tid for _, tid in chat_builder.codebook] + [tid for tid in chat_builder.yes_no_ids if tid not in {t for _, t in chat_builder.codebook}]
+    ids = [tid for _, tid in chat_builder.codebook] + [
+        tid for tid in chat_builder.yes_no_ids if tid not in {t for _, t in chat_builder.codebook}
+    ]
     slice_w = full_w.index_select(0, torch.tensor(ids, dtype=torch.long)).clone()
     cb_head = CodebookLMHead(slice_w, ids)
     assert sum(p.numel() for p in cb_head.parameters()) == 0  # frozen buffer only
@@ -460,6 +462,7 @@ def test_detect_model_family_and_strip_unused_multimodal_towers() -> None:
 
 def test_gemma4_codebook_v1_determinism_and_softcap_readout() -> None:
     from pathlib import Path
+
     from safetensors.torch import save_file
 
     assert GEMMA4_CODEBOOK_V1_PATH.exists(), f"Missing versioned codebook: {GEMMA4_CODEBOOK_V1_PATH}"
@@ -548,8 +551,12 @@ def test_gemma4_from_backbone_preserves_fp32_inv_freq_and_heads() -> None:
     class _DummyRotary(torch.nn.Module):
         def __init__(self) -> None:
             super().__init__()
-            self.register_buffer("full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False)
-            self.register_buffer("sliding_attention_inv_freq", torch.tensor([1.0, 0.25], dtype=torch.float32), persistent=False)
+            self.register_buffer(
+                "full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False
+            )
+            self.register_buffer(
+                "sliding_attention_inv_freq", torch.tensor([1.0, 0.25], dtype=torch.float32), persistent=False
+            )
 
     class _DummyGemmaBackbone(torch.nn.Module):
         def __init__(self) -> None:
@@ -635,7 +642,9 @@ def test_gemma4_model_parallel_userdict_kv_sharing_and_fp32_inv_freq() -> None:
     class _DummyRotary(torch.nn.Module):
         def __init__(self) -> None:
             super().__init__()
-            self.register_buffer("full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False)
+            self.register_buffer(
+                "full_attention_inv_freq", torch.tensor([1.0, 0.5], dtype=torch.float32), persistent=False
+            )
 
     class _DummyGemmaLayer(torch.nn.Module):
         def __init__(self, idx: int, hidden_size: int) -> None:
