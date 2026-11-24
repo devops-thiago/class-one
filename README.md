@@ -1,11 +1,23 @@
-# ClassOne (Classifier One)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/classone-logo-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/classone-logo.png" />
+    <img src="assets/classone-logo.png" alt="ClassOne (Classifier One)" width="320" />
+  </picture>
+</p>
 
-[![CI](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml/badge.svg)](https://github.com/devops-thiago/class-one/actions/workflows/ci.yml)
-[![Code License: Apache 2.0](https://img.shields.io/badge/Code-Apache_2.0-blue.svg)](LICENSE)
-[![Dataset License: CC BY-NC-SA 4.0](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-CC_BY--NC--SA_4.0-orange)](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)
-[![PyPI](https://img.shields.io/pypi/v/classone)](https://pypi.org/project/classone/)
-[![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa)](https://github.com/sponsors/devops-thiago)
+<p align="center">
+  <strong>Calibrated single-pass System 1 decision heads for open-weight LLMs (Qwen 3.5 &amp; Gemma 4)</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/devops-thiago/class-one/actions/workflows/ci.yml"><img src="https://github.com/devops-thiago/class-one/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Code-Apache_2.0-blue.svg" alt="Code License: Apache 2.0" /></a>
+  <a href="https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-CC_BY--NC--SA_4.0-orange" alt="Dataset License: CC BY-NC-SA 4.0" /></a>
+  <a href="https://pypi.org/project/classone/"><img src="https://img.shields.io/pypi/v/classone" alt="PyPI" /></a>
+  <a href="https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow" alt="Hugging Face Models" /></a>
+  <a href="https://github.com/sponsors/devops-thiago"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa" alt="Sponsor" /></a>
+</p>
 
 **ClassOne (Classifier One)** attaches calibrated single-pass decision heads (`Noul`, `Choice`, `Score`) onto open-weight language models (`Qwen 3.5` and `Gemma 4`). Instead of decoding JSON or explanatory prose token by token, a model evaluates structured booleans, multi-option routing, and ordinal rubrics in **one forward pass** with probabilities calibrated by strictly proper scoring rules (Focal NLL [γ=2.0] + Brier + margin loss + temperature scaling). Use it directly via the Python SDK and FastAPI server or load the merged standalone checkpoints from Hugging Face.
 
