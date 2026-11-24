@@ -5,6 +5,7 @@
 [![Dataset License: CC BY-NC-SA 4.0](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-CC_BY--NC--SA_4.0-orange)](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)
 [![PyPI](https://img.shields.io/pypi/v/classone)](https://pypi.org/project/classone/)
 [![Hugging Face Models](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/collections/devops-thiago/classone-system-1-decision-models-6ac685b81e8bbfa51e646e21)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa)](https://github.com/sponsors/devops-thiago)
 
 **ClassOne (Classifier One)** attaches calibrated single-pass decision heads (`Noul`, `Choice`, `Score`) onto open-weight language models (`Qwen 3.5` and `Gemma 4`). Instead of decoding JSON or explanatory prose token by token, a model evaluates structured booleans, multi-option routing, and ordinal rubrics in **one forward pass** with probabilities calibrated by strictly proper scoring rules (Focal NLL [γ=2.0] + Brier + margin loss + temperature scaling). Use it directly via the Python SDK and FastAPI server or load the merged standalone checkpoints from Hugging Face.
 
@@ -265,4 +266,4 @@ python scripts/eval_prompt_injection.py --model devops-thiago/classone-qwen3.5-9
 
 - **Source Code & Python SDK (`src/`, `scripts/`):** Released under the **[Apache License 2.0](LICENSE)** (permissive commercial and open-source use).
 - **Training Curriculum Dataset ([`devops-thiago/classone-system-one-curriculum`](https://huggingface.co/datasets/devops-thiago/classone-system-one-curriculum)):** Released under **[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)** (NonCommercial ShareAlike) because it incorporates upstream non-commercial academic and safety benchmark subsets. Review upstream dataset licenses before commercial retraining.
-- **Base Models:** **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms); **Qwen 3.5** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://github.com/QwenLM/Qwen3.5).
+- **Base Models:** **Gemma** is a trademark of Google LLC and provided subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms); **Qwen 3.5** is developed by the Qwen Team at Alibaba Cloud and provided under the [Apache 2.0 License](https://huggingface.co/Qwen/Qwen3.5-9B/blob/main/LICENSE).
