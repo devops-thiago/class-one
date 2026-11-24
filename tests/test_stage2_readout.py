@@ -240,7 +240,7 @@ def test_evaluate_stage2_request_and_server_routing(monkeypatch) -> None:
 def test_sdk_exports_and_stage2_config_propagation() -> None:
     import classone
 
-    assert classone.__version__ == "0.3.0"
+    assert classone.__version__ == "0.4.0"
     for sym in (
         "ChatDecisionPromptBuilder",
         "ChatPackedQuestion",
